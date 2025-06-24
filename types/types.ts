@@ -6,5 +6,6 @@ export type RootStackParamList = {
   OrdemScreen: undefined;
   VisualizarScreen: undefined;
   FinalizarScreen: { ordemId: string }; // ✅ ADICIONE ISSO
+  AssinaturaScreen: undefined;
   FinalizadasScreen: undefined;
 }

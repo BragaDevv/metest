@@ -10,6 +10,7 @@ import OrdemScreen from "./screens/OrdemScreen";
 import VisualizarScreen from "./screens/VisualizarScreen";
 import FinalizarScreen from "@screens/FinalizarScreen";
 import FinalizadasScreen from "@screens/FinalizadasScreen";
+import AssinaturaScreen from "@screens/AssinaturaScreen";
 
 
 
@@ -49,6 +50,11 @@ export default function App() {
              <Stack.Screen
               name="FinalizadasScreen"
               component={FinalizadasScreen}
+              options={{ headerShown: true }}
+            />
+             <Stack.Screen
+              name="AssinaturaScreen"
+              component={AssinaturaScreen}
               options={{ headerShown: true }}
             />
           </Stack.Navigator>

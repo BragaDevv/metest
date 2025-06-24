@@ -7,7 +7,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     slug: "metest-app",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./assets/images/icon.png",
     userInterfaceStyle: "light",
     assetBundlePatterns: ["**/*"],
     plugins: [

@@ -18,7 +18,7 @@ export default function AbrirOrdemServicoScreen() {
   const [empresa, setEmpresa] = useState("");
   const [descricao, setDescricao] = useState("");
   const [localizacao, setLocalizacao] = useState("");
-  const [fotos, setFotos] = useState<string[]>([]);
+  const [fotosAntes, setFotos] = useState<string[]>([]);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const gerarNumeroOrdem = async (): Promise<string> => {
@@ -45,7 +45,7 @@ export default function AbrirOrdemServicoScreen() {
     });
 
     if (!result.canceled && result.assets.length > 0) {
-      setFotos([...fotos, result.assets[0].uri]);
+      setFotos([...fotosAntes, result.assets[0].uri]);
     }
   };
 
@@ -68,7 +68,7 @@ export default function AbrirOrdemServicoScreen() {
         empresa,
         descricao,
         localizacao,
-        fotos,
+        fotosAntes,
         status: "pendente",
         criadoEm: serverTimestamp(),
       });
@@ -126,7 +126,7 @@ export default function AbrirOrdemServicoScreen() {
       </TouchableOpacity>
 
       <FlatList
-        data={fotos}
+        data={fotosAntes}
         horizontal
         keyExtractor={(item) => item}
         renderItem={({ item }) => (

@@ -47,14 +47,16 @@ export default function FinalizarOrdemScreen() {
 
     try {
       await updateDoc(doc(db, "ordens_servico", ordemId), {
-        status: "finalizada",
+        status: "aguardando_assinatura",
         descricaoFinal,
         observacoes,
-        fotos,
+        fotosDepois: fotos,
         responsavel,
-        assinatura,
+        assinatura_cliente: assinatura,
         finalizadoEm: serverTimestamp(),
       });
+
+
       Alert.alert("Ordem finalizada com sucesso!");
       navigation.goBack();
     } catch (err) {
@@ -134,28 +136,6 @@ export default function FinalizarOrdemScreen() {
         multiline
       />
 
-      <TouchableOpacity style={styles.addPhotoButton} onPress={escolherFoto}>
-        <Text style={styles.buttonText}>Selecionar Fotos</Text>
-      </TouchableOpacity>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ marginTop: 10 }}
-      >
-        {fotos.map((uri, index) => (
-          <View key={index} style={{ position: "relative", marginRight: 10 }}>
-            <Image source={{ uri }} style={styles.foto} />
-            <TouchableOpacity
-              onPress={() => removerFoto(index)}
-              style={styles.removerBotao}
-            >
-              <Text style={{ color: "#fff", fontWeight: "bold" }}>X</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </ScrollView>
-
       <TextInput
         style={styles.input}
         placeholder="Nome do Responsável"
@@ -203,6 +183,28 @@ export default function FinalizarOrdemScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      <TouchableOpacity style={styles.addPhotoButton} onPress={escolherFoto}>
+        <Text style={styles.buttonText}>Selecionar Fotos</Text>
+      </TouchableOpacity>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginTop: 10 }}
+      >
+        {fotos.map((uri, index) => (
+          <View key={index} style={{ position: "relative", marginRight: 10 }}>
+            <Image source={{ uri }} style={styles.foto} />
+            <TouchableOpacity
+              onPress={() => removerFoto(index)}
+              style={styles.removerBotao}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>X</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </ScrollView>
 
       <TouchableOpacity style={styles.button} onPress={handleFinalizar}>
         <Text style={styles.buttonText}>Finalizar Ordem</Text>
@@ -256,11 +258,11 @@ const styles = StyleSheet.create({
   },
   removerBotao: {
     position: "absolute",
-    top: -6,
-    right: -6,
+    top: 1,
+    right: 1,
     backgroundColor: "#e74c3c",
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     borderRadius: 11,
     justifyContent: "center",
     alignItems: "center",
