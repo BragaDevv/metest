@@ -15,6 +15,8 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/types";
 import { getAuth } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
+import * as Location from "expo-location";
+
 
 interface Ordem {
   id: string;
@@ -87,20 +89,36 @@ export default function VisualizarOrdensScreen() {
     ]);
   };
 
-  const iniciarOrdem = async (id: string) => {
-    try {
-      const ordemRef = doc(db, "ordens_servico", id);
-      await updateDoc(ordemRef, {
-        status: "em_execucao",
-        inicioExecucao: serverTimestamp(), // ✅ adiciona hora de início
-        executadoPor: userEmail, // ✅ salva o executor
-      });
-      Alert.alert("Ordem iniciada");
-      fetchOrdens();
-    } catch (err) {
-      Alert.alert("Erro ao iniciar ordem");
+ const iniciarOrdem = async (id: string) => {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permissão de localização negada");
+      return;
     }
-  };
+
+    const location = await Location.getCurrentPositionAsync({});
+    const { latitude, longitude } = location.coords;
+
+    const ordemRef = doc(db, "ordens_servico", id);
+    await updateDoc(ordemRef, {
+      status: "em_execucao",
+      inicioExecucao: serverTimestamp(),
+      executadoPor: userEmail,
+      localInicio: {
+        latitude,
+        longitude,
+      },
+    });
+
+    Alert.alert("Ordem iniciada");
+    fetchOrdens();
+  } catch (err) {
+    console.error(err);
+    Alert.alert("Erro ao iniciar ordem");
+  }
+};
+
 
   const toggleDetalhes = (id: string) => {
     setDetalhesVisiveis(detalhesVisiveis === id ? null : id);
@@ -174,7 +192,7 @@ export default function VisualizarOrdensScreen() {
 
           {Array.isArray(item.fotosAntes) && item.fotosAntes.length > 0 && (
             <>
-              <Text style={styles.label}>Fotos do Problema</Text>
+              <Text style={styles.label}>Fotos relacionadas a Ordem #{item.numeroOrdem} </Text>
               <View style={styles.imagensContainer}>
                 {item.fotosAntes.map((url, idx) => (
                   <Image

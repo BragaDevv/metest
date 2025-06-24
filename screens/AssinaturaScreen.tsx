@@ -19,6 +19,9 @@ import { db } from "../firebaseConfig";
 import { Ionicons } from "@expo/vector-icons";
 import { getAuth } from "firebase/auth";
 import SignatureScreen from "react-native-signature-canvas";
+import MapView, { Marker } from "react-native-maps";
+import * as Location from "expo-location";
+
 
 interface Ordem {
   id: string;
@@ -38,6 +41,10 @@ interface Ordem {
   inicioExecucao?: any;
   finalizadoEm?: any;
   executadoPor?: string;
+  localInicio?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 export default function AguardandoAssinaturaScreen() {
@@ -51,6 +58,14 @@ export default function AguardandoAssinaturaScreen() {
   const [assinaturaTemp, setAssinaturaTemp] = useState<string | null>(null);
   const [assinaturaCapturadaPara, setAssinaturaCapturadaPara] = useState<string | null>(null);
 
+  const [modalVisible, setModalVisible] = useState(false);
+  const [localSelecionado, setLocalSelecionado] = useState<{
+    latitude: number;
+    longitude: number;
+    localizacao: string;
+  } | null>(null);
+
+
   useEffect(() => {
     if (!isAdmin) {
       Alert.alert("Acesso negado", "Apenas administradores podem acessar esta tela.");
@@ -62,9 +77,15 @@ export default function AguardandoAssinaturaScreen() {
   const fetchOrdensAguardando = async () => {
     try {
       const snapshot = await getDocs(collection(db, "ordens_servico"));
-      const aguardando = snapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Ordem))
-        .filter((ordem) => ordem.status === "aguardando_assinatura");
+      const aguardando = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          localInicio: data.localInicio ?? null, // <-- garante estrutura
+        } as Ordem;
+      }).filter((ordem) => ordem.status === "aguardando_assinatura");
+
       setOrdensAguardando(aguardando);
     } catch (err) {
       console.error("Erro ao buscar ordens aguardando assinatura:", err);
@@ -93,7 +114,6 @@ export default function AguardandoAssinaturaScreen() {
           />
         </TouchableOpacity>
       </View>
-
       <Text style={styles.title}>{item.cliente} - {item.empresa}</Text>
       <Text style={styles.status}>Status: {item.status}</Text>
 
@@ -158,6 +178,52 @@ export default function AguardandoAssinaturaScreen() {
             {item.finalizadoEm && (
               <Text><Text style={styles.label}>Finalizado em:</Text> {new Date(item.finalizadoEm.seconds * 1000).toLocaleString("pt-BR")}</Text>
             )}
+
+            {item.localInicio && (
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+                <Text>
+                  <Text style={styles.label}>Localização do Executante:</Text>{" "}
+                  {item.localInicio.latitude.toFixed(5)}
+                  {item.localInicio.longitude.toFixed(5)}
+                </Text>
+                <TouchableOpacity
+                  style={{ position: 'relative', left: -100, top: 4 }}
+                  onPress={async () => {
+                    if (item.localInicio?.latitude && item.localInicio?.longitude) {
+                      try {
+                        const enderecoResult = await Location.reverseGeocodeAsync({
+                          latitude: item.localInicio.latitude,
+                          longitude: item.localInicio.longitude,
+                        });
+
+                        const enderecoLegivel = enderecoResult[0]
+                          ? `${enderecoResult[0].street}, ${enderecoResult[0].district}, ${enderecoResult[0].city} - ${enderecoResult[0].region}`
+                          : "Endereço não encontrado";
+
+                        setLocalSelecionado({
+                          latitude: item.localInicio.latitude,
+                          longitude: item.localInicio.longitude,
+                          localizacao: enderecoLegivel, // agora vem do reverse geocode
+                        });
+
+                        setModalVisible(true);
+                      } catch (err) {
+                        console.error("Erro ao buscar endereço:", err);
+                        Alert.alert("Erro ao obter endereço do executante");
+                      }
+                    } else {
+                      Alert.alert("Localização indisponível", "Esta ordem não possui coordenadas do executante.");
+                    }
+                  }}
+
+                >
+                  <Ionicons name="add-circle-outline" size={22} color="#007bff" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+
+
           </View>
           {item.assinatura_cliente ? (
             <View>
@@ -280,6 +346,47 @@ export default function AguardandoAssinaturaScreen() {
         </View>
       </Modal>
 
+      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitleMaps}>Localização do Executante</Text>
+              {localSelecionado && (
+                <>
+                  {localSelecionado?.localizacao && (
+                    <Text style={styles.modalEndereco}>{localSelecionado.localizacao}</Text>
+                  )}
+                  <MapView
+                    style={styles.modalMap}
+                    initialRegion={{
+                      latitude: localSelecionado.latitude,
+                      longitude: localSelecionado.longitude,
+                      latitudeDelta: 0.005,
+                      longitudeDelta: 0.005,
+                    }}
+                  >
+                    <Marker
+                      coordinate={{
+                        latitude: localSelecionado.latitude,
+                        longitude: localSelecionado.longitude,
+                      }}
+                      title="Executante"
+                      description={localSelecionado.localizacao}
+                    />
+                  </MapView>
+                </>
+              )}
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -363,6 +470,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  modalTitleMaps: {
+    color: '#000',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
   modalCloseBtn: {
     backgroundColor: '#dc3545',
     paddingVertical: 6,
@@ -381,17 +493,43 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   semOrdensContainer: {
-  flex: 1,
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingTop: 50,
-},
-semOrdensTexto: {
-  fontSize: 16,
-  color: '#555',
-  textAlign: 'center',
-  lineHeight: 24,
-},
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 50,
+  },
+  semOrdensTexto: {
+    fontSize: 16,
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  modalContent: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    padding: 20,
+    alignItems: "center",
+  },
+
+  modalEndereco: {
+    marginBottom: 10,
+    textAlign: "center",
+    color: "#333",
+  },
+  modalMap: {
+    width: "100%",
+    height: 300,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  modalCloseButton: {
+    backgroundColor: "#007bff",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+
 
 
 });

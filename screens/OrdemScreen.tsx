@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
-  ScrollView, Alert, Image, FlatList
+  ScrollView, Alert, Image, FlatList,
+  ActivityIndicator
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import {
@@ -17,8 +18,14 @@ export default function AbrirOrdemServicoScreen() {
   const [cliente, setCliente] = useState("");
   const [empresa, setEmpresa] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [cep, setCep] = useState("");
+  const [enderecoCompleto, setEnderecoCompleto] = useState("");
+  const [numero, setNumero] = useState("");
   const [localizacao, setLocalizacao] = useState("");
   const [fotosAntes, setFotos] = useState<string[]>([]);
+  const [loadingImagem, setLoadingImagem] = useState(false);
+
+
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const gerarNumeroOrdem = async (): Promise<string> => {
@@ -39,22 +46,30 @@ export default function AbrirOrdemServicoScreen() {
   };
 
   const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.5,
-    });
+    try {
+      setLoadingImagem(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.5,
+      });
 
-    if (!result.canceled && result.assets.length > 0) {
-      setFotos([...fotosAntes, result.assets[0].uri]);
+      if (!result.canceled && result.assets.length > 0) {
+        setFotos([...fotosAntes, result.assets[0].uri]);
+      }
+    } catch (error) {
+      Alert.alert("Erro ao carregar imagem");
+    } finally {
+      setLoadingImagem(false);
     }
   };
+
 
   const handleRemoveImage = (uri: string) => {
     setFotos((prev) => prev.filter((foto) => foto !== uri));
   };
 
   const handleSubmit = async () => {
-    if (!cliente || !empresa || !descricao || !localizacao) {
+    if (!cliente || !empresa || !descricao || !localizacao || !numero) {
       Alert.alert("Preencha todos os campos");
       return;
     }
@@ -67,7 +82,7 @@ export default function AbrirOrdemServicoScreen() {
         cliente,
         empresa,
         descricao,
-        localizacao,
+        localizacao: `${localizacao}, Nº ${numero}`,
         fotosAntes,
         status: "pendente",
         criadoEm: serverTimestamp(),
@@ -77,6 +92,9 @@ export default function AbrirOrdemServicoScreen() {
       setCliente("");
       setEmpresa("");
       setDescricao("");
+      setCep("");
+      setEnderecoCompleto("");
+      setNumero("");
       setLocalizacao("");
       setFotos([]);
       navigation.goBack();
@@ -90,21 +108,21 @@ export default function AbrirOrdemServicoScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Image source={require("../assets/images/icon.png")} style={styles.bgLogo} />
       <Text style={styles.title}>Nova Ordem de Serviço</Text>
-
+      <Text style={styles.label}>Nome do Cliente / Responsável:</Text>
       <TextInput
         style={styles.input}
         placeholder="Nome do Cliente"
         value={cliente}
         onChangeText={setCliente}
       />
-
+      <Text style={styles.label}>Empresa:</Text>
       <TextInput
         style={styles.input}
         placeholder="Empresa"
         value={empresa}
         onChangeText={setEmpresa}
       />
-
+      <Text style={styles.label}>Descrição do Serviço:</Text>
       <TextInput
         style={[styles.input, { height: 100 }]}
         placeholder="Descrição do Serviço"
@@ -113,17 +131,60 @@ export default function AbrirOrdemServicoScreen() {
         multiline
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Localização (GPS ou Endereço)"
-        value={localizacao}
-        onChangeText={setLocalizacao}
-      />
+      <View style={styles.containerCEP}>
 
-      <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
-        <MaterialIcons name="photo-camera" size={22} color="#fff" />
-        <Text style={styles.imageButtonText}>Adicionar Foto</Text>
-      </TouchableOpacity>
+        <Text style={styles.label}>CEP:</Text>
+        <TextInput
+          style={styles.inputCEP}
+          placeholder="CEP"
+          value={cep}
+          onChangeText={async (value) => {
+            setCep(value);
+            if (value.length === 8) {
+              try {
+                const response = await fetch(`https://viacep.com.br/ws/${value}/json/`);
+                const data = await response.json();
+                if (data.erro) {
+                  Alert.alert("CEP não encontrado");
+                  setEnderecoCompleto("");
+                  return;
+                }
+                const endereco = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
+                setEnderecoCompleto(endereco);
+                setLocalizacao(endereco);
+              } catch (error) {
+                Alert.alert("Erro ao buscar endereço");
+                setEnderecoCompleto("");
+              }
+            } else {
+              setEnderecoCompleto("");
+            }
+          }}
+          keyboardType="numeric"
+        />
+
+        <Text style={styles.label}>Número:</Text>
+        <TextInput
+          style={styles.inputCEP}
+          placeholder="Número"
+          value={numero}
+          onChangeText={setNumero}
+          keyboardType="numeric"
+        />
+      </View>
+      {enderecoCompleto ? (
+        <Text style={styles.enderecoPreview}>Endereço: {enderecoCompleto}, {numero}</Text>
+      ) : null}
+
+      {loadingImagem ? (
+        <ActivityIndicator size="large" color="#2e86de" style={{ marginVertical: 15 }} />
+      ) : (
+        <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
+          <MaterialIcons name="photo-camera" size={22} color="#fff" />
+          <Text style={styles.imageButtonText}>Adicionar Foto</Text>
+        </TouchableOpacity>
+      )}
+
 
       <FlatList
         data={fotosAntes}
@@ -154,10 +215,16 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     position: "relative",
   },
+  containerCEP: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 10
+  },
   bgLogo: {
     position: "absolute",
     opacity: 0.06,
-    width: "100%",
+    width: "115%",
     height: "100%",
     resizeMode: "contain",
   },
@@ -174,8 +241,28 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 10,
     padding: 12,
-    marginBottom: 15,
+    marginBottom: 5,
     elevation: 2,
+  },
+  inputCEP: {
+    width: '30%',
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 5,
+    elevation: 2,
+  },
+  enderecoPreview: {
+    backgroundColor: "#eef",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#ccd",
+    fontSize: 14,
+    color: "#333",
   },
   imageButton: {
     flexDirection: "row",
@@ -183,7 +270,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2e86de",
     padding: 12,
     borderRadius: 10,
-    marginBottom: 10,
+    marginVertical: 10,
     elevation: 3,
     justifyContent: "center",
   },
@@ -203,8 +290,8 @@ const styles = StyleSheet.create({
   },
   removeImage: {
     position: "absolute",
-    top: -8,
-    right: -8,
+    top: -3,
+    right: -3,
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 2,
@@ -223,5 +310,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  label: {
+    fontWeight: "bold",
+    color: "#333",
+    marginVertical: 6,
+    marginLeft: 5
   },
 });
