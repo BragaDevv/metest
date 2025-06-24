@@ -1,0 +1,49 @@
+# 📚 Documentação
+# Saiba mais: https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# 📦 Dependências
+node_modules/
+
+# ⚙️ Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# ⚙️ Build Android/iOS
+android/
+ios/
+*.apk
+*.aab
+
+# 🔐 Arquivos sensíveis
+.env
+.env.*
+*.pem
+*.p8
+*.p12
+*.key
+*.jks
+*.mobileprovision
+android/app/google-services.json
+
+# ⚠️ Arquivos de lock (opcional ignorar em projetos Expo)
+package-lock.json
+yarn.lock
+
+# 🛠 Metro bundler
+.metro-health-check*
+
+# 🐞 Logs de debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# 🍎 macOS
+.DS_Store
+
+# 📄 TypeScript
+*.tsbuildinfo
+
+# 🗑 Arquivos de merge ou backup
+*.orig.*
