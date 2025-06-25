@@ -169,6 +169,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   logo: {
+    position:'absolute',
+    top:50,
     width: 280,
     height: 200,
     marginBottom: 20,
@@ -228,6 +230,8 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   logoutButton: {
+    position:'absolute',
+    bottom:70,
     flexDirection: "row",
     alignItems: "center",
     marginTop: 30,

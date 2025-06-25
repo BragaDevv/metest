@@ -7,7 +7,13 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 type Usuario = {
@@ -16,6 +22,8 @@ type Usuario = {
   email: string;
   tipo: "adm" | "funcionario";
 };
+
+const EMAIL_PROTEGIDO = "bragadevv@metest.com";
 
 export default function AdminPainelScreen() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -55,26 +63,70 @@ export default function AdminPainelScreen() {
     }
   };
 
+  const excluirUsuario = async (usuario: Usuario) => {
+    Alert.alert(
+      "Excluir Usuário",
+      `Tem certeza que deseja excluir ${usuario.nome}?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDoc(doc(db, "usuarios", usuario.id));
+              Alert.alert("Usuário excluído com sucesso");
+              buscarUsuarios();
+            } catch (error) {
+              Alert.alert("Erro ao excluir usuário");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   useEffect(() => {
     buscarUsuarios();
   }, []);
 
-  const renderItem = ({ item }: { item: Usuario }) => (
-    <View style={styles.card}>
-      <View style={styles.infoContainer}>
-        <Text style={styles.nome}>{item.nome}</Text>
-        <Text style={styles.email}>{item.email}</Text>
-        <Text style={styles.tipo}>
-          Tipo: <Text style={{ fontWeight: "bold" }}>{item.tipo}</Text>
-        </Text>
+  const renderItem = ({ item }: { item: Usuario }) => {
+    const isProtegido = item.email === EMAIL_PROTEGIDO;
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.infoContainer}>
+          <Text style={styles.nome}>{item.nome}</Text>
+          <Text style={styles.email}>{item.email}</Text>
+          <Text style={styles.tipo}>
+            Tipo: <Text style={{ fontWeight: "bold" }}>{item.tipo}</Text>
+          </Text>
+        </View>
+
+        <View style={{ gap: 6 }}>
+          {!isProtegido && (
+            <TouchableOpacity
+              style={styles.botao}
+              onPress={() => alternarTipo(item)}
+            >
+              <Text style={styles.botaoTexto}>
+                {item.tipo === "adm" ? "Rebaixar" : "Promover"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {!isProtegido && (
+            <TouchableOpacity
+              style={[styles.botao, { backgroundColor: "#dc3545" }]}
+              onPress={() => excluirUsuario(item)}
+            >
+              <Text style={styles.botaoTexto}>Excluir</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
-      <TouchableOpacity style={styles.botao} onPress={() => alternarTipo(item)}>
-        <Text style={styles.botaoTexto}>
-          {item.tipo === "adm" ? "Rebaixar" : "Promover"}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>

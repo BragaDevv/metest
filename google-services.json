@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "207196379514",
+    "project_id": "metest-7faaa",
+    "storage_bucket": "metest-7faaa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:207196379514:android:45167db53a7909423fdec3",
+        "android_client_info": {
+          "package_name": "com.metest.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyButoXdYtAgUmZEcH2kUZBsAq4keNoYIYU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

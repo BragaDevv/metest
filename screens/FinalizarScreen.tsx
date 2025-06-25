@@ -65,6 +65,14 @@ export default function FinalizarOrdemScreen() {
         finalizadoEm: serverTimestamp(),
       });
 
+      await fetch("https://metest-backend.onrender.com/api/send-to-admins", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ordemId }),
+      });
+
       Alert.alert("Ordem finalizada com sucesso!");
       navigation.goBack();
     } catch (err) {
@@ -78,7 +86,10 @@ export default function FinalizarOrdemScreen() {
     const locationPerm = await Location.requestForegroundPermissionsAsync();
 
     if (!cameraPerm.granted || !locationPerm.granted) {
-      Alert.alert("Permissões necessárias", "Permita acesso à câmera e localização.");
+      Alert.alert(
+        "Permissões necessárias",
+        "Permita acesso à câmera e localização."
+      );
       return;
     }
 
@@ -279,7 +290,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   foto: {
-    width: '100%',
+    width: "100%",
     height: 100,
     borderRadius: 10,
   },

@@ -138,16 +138,19 @@ export default function AbrirOrdemServicoScreen() {
         criadoEm: serverTimestamp(),
       });
 
-      await fetch("https://metest-backend.onrender.com/send-notification", {
+      console.log("Chamando backend para enviar notificação");
+      await fetch("https://metest-backend.onrender.com/api/send-notification", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: `Nova OS #${numeroOrdem}`,
-          body: `${empresa} - ${descricao}`,
+          numeroOrdem,
+          cliente,
+          descricao,
         }),
       });
+
       Alert.alert(`Ordem n° ${numeroOrdem} criada com sucesso!`);
       setCliente("");
       setEmpresa("");

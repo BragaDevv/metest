@@ -1,4 +1,5 @@
 import { ExpoConfig, ConfigContext } from "@expo/config";
+import "dotenv/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   return {
@@ -28,6 +29,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         backgroundColor: "#ffffff",
       },
       permissions: ["ACCESS_FINE_LOCATION"],
+      googleServicesFile: "./google-services.json",
     },
     ios: {
       bundleIdentifier: "com.metest.app",
@@ -39,8 +41,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     extra: {
       eas: {
-        projectId: "ec4a3ae6-c127-44af-84f5-71d37adb7cff",
+        projectId: "dbce0688-d394-4f88-8a1c-95da81d0d8f2",
       },
+      googleServicesJson: process.env.GOOGLE_SERVICES_JSON, 
     },
     runtimeVersion: {
       policy: "sdkVersion",
