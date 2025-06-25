@@ -27,10 +27,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff",
       },
+      permissions: ["ACCESS_FINE_LOCATION"],
     },
     ios: {
       bundleIdentifier: "com.metest.app",
       supportsTablet: true,
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription:
+          "Precisamos da sua localização para registrar corretamente o início da ordem de serviço.",
+      },
     },
     extra: {},
     runtimeVersion: {

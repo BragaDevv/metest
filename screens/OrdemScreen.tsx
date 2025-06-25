@@ -1,12 +1,26 @@
 import React, { useState } from "react";
 import {
-  View, Text, TextInput, StyleSheet, TouchableOpacity,
-  ScrollView, Alert, Image, FlatList,
-  ActivityIndicator
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  Image,
+  FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import {
-  collection, addDoc, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp
+  collection,
+  addDoc,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  increment,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { useNavigation } from "@react-navigation/native";
@@ -24,9 +38,10 @@ export default function AbrirOrdemServicoScreen() {
   const [localizacao, setLocalizacao] = useState("");
   const [fotosAntes, setFotos] = useState<string[]>([]);
   const [loadingImagem, setLoadingImagem] = useState(false);
+  const [carregandoCEP, setCarregandoCEP] = useState(false);
 
-
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const gerarNumeroOrdem = async (): Promise<string> => {
     const controleRef = doc(db, "controle_ordens", "contador");
@@ -46,23 +61,58 @@ export default function AbrirOrdemServicoScreen() {
   };
 
   const handlePickImage = async () => {
-    try {
-      setLoadingImagem(true);
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.5,
-      });
+    Alert.alert(
+      "Selecionar Imagem",
+      "Escolha a origem da imagem:",
+      [
+        {
+          text: "Câmera",
+          onPress: async () => {
+            try {
+              setLoadingImagem(true);
+              const cameraResult = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.5,
+              });
 
-      if (!result.canceled && result.assets.length > 0) {
-        setFotos([...fotosAntes, result.assets[0].uri]);
-      }
-    } catch (error) {
-      Alert.alert("Erro ao carregar imagem");
-    } finally {
-      setLoadingImagem(false);
-    }
+              if (!cameraResult.canceled && cameraResult.assets.length > 0) {
+                setFotos((prev) => [...prev, cameraResult.assets[0].uri]);
+              }
+            } catch (error) {
+              Alert.alert("Erro ao abrir a câmera");
+            } finally {
+              setLoadingImagem(false);
+            }
+          },
+        },
+        {
+          text: "Galeria",
+          onPress: async () => {
+            try {
+              setLoadingImagem(true);
+              const galleryResult = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.5,
+              });
+
+              if (!galleryResult.canceled && galleryResult.assets.length > 0) {
+                setFotos((prev) => [...prev, galleryResult.assets[0].uri]);
+              }
+            } catch (error) {
+              Alert.alert("Erro ao acessar a galeria");
+            } finally {
+              setLoadingImagem(false);
+            }
+          },
+        },
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
   };
-
 
   const handleRemoveImage = (uri: string) => {
     setFotos((prev) => prev.filter((foto) => foto !== uri));
@@ -106,7 +156,10 @@ export default function AbrirOrdemServicoScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Image source={require("../assets/images/icon.png")} style={styles.bgLogo} />
+      <Image
+        source={require("../assets/images/icon.png")}
+        style={styles.bgLogo}
+      />
       <Text style={styles.title}>Nova Ordem de Serviço</Text>
       <Text style={styles.label}>Nome do Cliente / Responsável:</Text>
       <TextInput
@@ -132,7 +185,6 @@ export default function AbrirOrdemServicoScreen() {
       />
 
       <View style={styles.containerCEP}>
-
         <Text style={styles.label}>CEP:</Text>
         <TextInput
           style={styles.inputCEP}
@@ -140,21 +192,43 @@ export default function AbrirOrdemServicoScreen() {
           value={cep}
           onChangeText={async (value) => {
             setCep(value);
+
             if (value.length === 8) {
+              setCarregandoCEP(true);
               try {
-                const response = await fetch(`https://viacep.com.br/ws/${value}/json/`);
-                const data = await response.json();
-                if (data.erro) {
-                  Alert.alert("CEP não encontrado");
+                const responseViaCEP = await fetch(
+                  `https://viacep.com.br/ws/${value}/json/`
+                );
+                if (!responseViaCEP.ok) throw new Error("ViaCEP fora do ar");
+
+                const dataViaCEP = await responseViaCEP.json();
+                if (dataViaCEP.erro)
+                  throw new Error("CEP não encontrado no ViaCEP");
+
+                const enderecoViaCEP = `${dataViaCEP.logradouro}, ${dataViaCEP.bairro}, ${dataViaCEP.localidade} - ${dataViaCEP.uf}`;
+                setEnderecoCompleto(enderecoViaCEP);
+                setLocalizacao(enderecoViaCEP);
+              } catch (errorViaCEP) {
+                try {
+                  const responseBrasilAPI = await fetch(
+                    `https://brasilapi.com.br/api/cep/v1/${value}`
+                  );
+                  if (!responseBrasilAPI.ok)
+                    throw new Error("Erro na BrasilAPI");
+
+                  const dataBrasil = await responseBrasilAPI.json();
+                  const enderecoBrasil = `${dataBrasil.street}, ${dataBrasil.neighborhood}, ${dataBrasil.city} - ${dataBrasil.state}`;
+                  setEnderecoCompleto(enderecoBrasil);
+                  setLocalizacao(enderecoBrasil);
+                } catch (errorBrasilAPI) {
+                  Alert.alert(
+                    "Erro",
+                    "Não foi possível buscar o endereço. Verifique o CEP ou tente mais tarde."
+                  );
                   setEnderecoCompleto("");
-                  return;
                 }
-                const endereco = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
-                setEnderecoCompleto(endereco);
-                setLocalizacao(endereco);
-              } catch (error) {
-                Alert.alert("Erro ao buscar endereço");
-                setEnderecoCompleto("");
+              } finally {
+                setCarregandoCEP(false);
               }
             } else {
               setEnderecoCompleto("");
@@ -172,19 +246,30 @@ export default function AbrirOrdemServicoScreen() {
           keyboardType="numeric"
         />
       </View>
-      {enderecoCompleto ? (
-        <Text style={styles.enderecoPreview}>Endereço: {enderecoCompleto}, {numero}</Text>
+      {carregandoCEP ? (
+        <ActivityIndicator
+          size="small"
+          color="#2e86de"
+          style={{ marginVertical: 10 }}
+        />
+      ) : enderecoCompleto ? (
+        <Text style={styles.enderecoPreview}>
+          Endereço: {enderecoCompleto}, {numero}
+        </Text>
       ) : null}
 
       {loadingImagem ? (
-        <ActivityIndicator size="large" color="#2e86de" style={{ marginVertical: 15 }} />
+        <ActivityIndicator
+          size="large"
+          color="#2e86de"
+          style={{ marginVertical: 15 }}
+        />
       ) : (
         <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
           <MaterialIcons name="photo-camera" size={22} color="#fff" />
           <Text style={styles.imageButtonText}>Adicionar Foto</Text>
         </TouchableOpacity>
       )}
-
 
       <FlatList
         data={fotosAntes}
@@ -193,7 +278,10 @@ export default function AbrirOrdemServicoScreen() {
         renderItem={({ item }) => (
           <View style={styles.imagePreviewContainer}>
             <Image source={{ uri: item }} style={styles.imagePreview} />
-            <TouchableOpacity style={styles.removeImage} onPress={() => handleRemoveImage(item)}>
+            <TouchableOpacity
+              style={styles.removeImage}
+              onPress={() => handleRemoveImage(item)}
+            >
               <Ionicons name="close-circle" size={22} color="#e74c3c" />
             </TouchableOpacity>
           </View>
@@ -201,7 +289,12 @@ export default function AbrirOrdemServicoScreen() {
       />
 
       <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-        <Ionicons name="save-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+        <Ionicons
+          name="save-outline"
+          size={22}
+          color="#fff"
+          style={{ marginRight: 8 }}
+        />
         <Text style={styles.buttonText}>Salvar Ordem</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -216,10 +309,10 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   containerCEP: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 10
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginVertical: 10,
   },
   bgLogo: {
     position: "absolute",
@@ -238,17 +331,17 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#2e86de",
     borderRadius: 10,
     padding: 12,
     marginBottom: 5,
     elevation: 2,
   },
   inputCEP: {
-    width: '30%',
+    width: "30%",
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#2e86de",
     borderRadius: 10,
     padding: 12,
     marginBottom: 5,
@@ -302,7 +395,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#27ae60",
     padding: 15,
     borderRadius: 12,
-    marginTop: 20,
+    marginVertical: 10,
     justifyContent: "center",
     elevation: 4,
   },
@@ -315,6 +408,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     marginVertical: 6,
-    marginLeft: 5
+    marginLeft: 5,
   },
 });

@@ -17,10 +17,18 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/types";
 import * as ImagePicker from "expo-image-picker";
 import SignatureScreen from "react-native-signature-canvas";
+import * as Location from "expo-location";
 
 interface RouteParams {
   ordemId: string;
 }
+
+type FotoInfo = {
+  url: string;
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+};
 
 const CLOUD_NAME = "dy48gdjlv";
 const UPLOAD_PRESET = "metest_unsigned";
@@ -35,9 +43,10 @@ export default function FinalizarOrdemScreen() {
   const [observacoes, setObservacoes] = useState("");
   const [responsavel, setResponsavel] = useState("");
   const [assinatura, setAssinatura] = useState("");
-  const [fotos, setFotos] = useState<string[]>([]);
   const [showSignature, setShowSignature] = useState(false);
   const signatureRef = useRef<any>(null);
+
+  const [fotos, setFotos] = useState<FotoInfo[]>([]);
 
   const handleFinalizar = async () => {
     if (!descricaoFinal || !responsavel || !assinatura) {
@@ -56,7 +65,6 @@ export default function FinalizarOrdemScreen() {
         finalizadoEm: serverTimestamp(),
       });
 
-
       Alert.alert("Ordem finalizada com sucesso!");
       navigation.goBack();
     } catch (err) {
@@ -66,42 +74,55 @@ export default function FinalizarOrdemScreen() {
   };
 
   const escolherFoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
+    const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
+    const locationPerm = await Location.requestForegroundPermissionsAsync();
+
+    if (!cameraPerm.granted || !locationPerm.granted) {
+      Alert.alert("Permissões necessárias", "Permita acesso à câmera e localização.");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.6,
-      allowsMultipleSelection: true,
     });
 
     if (!result.canceled) {
-      const novasFotos: string[] = [];
+      const asset = result.assets[0];
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+      const timestamp = Date.now();
 
-      for (const asset of result.assets) {
-        const formData = new FormData();
-        formData.append("file", {
-          uri: asset.uri,
-          name: "foto.jpg",
-          type: "image/jpeg",
-        } as any);
-        formData.append("upload_preset", UPLOAD_PRESET);
+      const formData = new FormData();
+      formData.append("file", {
+        uri: asset.uri,
+        name: "foto.jpg",
+        type: "image/jpeg",
+      } as any);
+      formData.append("upload_preset", UPLOAD_PRESET);
 
-        try {
-          const response = await fetch(
-            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
-          const data = await response.json();
-          if (data.secure_url) {
-            novasFotos.push(data.secure_url);
+      try {
+        const response = await fetch(
+          `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+          {
+            method: "POST",
+            body: formData,
           }
-        } catch (error) {
-          console.error("Erro ao subir imagem:", error);
+        );
+        const data = await response.json();
+        if (data.secure_url) {
+          const novaFoto: FotoInfo = {
+            url: data.secure_url,
+            latitude,
+            longitude,
+            timestamp,
+          };
+          setFotos((prev) => [...prev, novaFoto]);
         }
+      } catch (error) {
+        console.error("Erro ao subir imagem:", error);
+        Alert.alert("Erro ao enviar imagem.");
       }
-
-      setFotos((prev) => [...prev, ...novasFotos]);
     }
   };
 
@@ -185,7 +206,7 @@ export default function FinalizarOrdemScreen() {
       </Modal>
 
       <TouchableOpacity style={styles.addPhotoButton} onPress={escolherFoto}>
-        <Text style={styles.buttonText}>Selecionar Fotos</Text>
+        <Text style={styles.buttonText}>Tirar Foto</Text>
       </TouchableOpacity>
 
       <ScrollView
@@ -193,15 +214,21 @@ export default function FinalizarOrdemScreen() {
         showsHorizontalScrollIndicator={false}
         style={{ marginTop: 10 }}
       >
-        {fotos.map((uri, index) => (
-          <View key={index} style={{ position: "relative", marginRight: 10 }}>
-            <Image source={{ uri }} style={styles.foto} />
+        {fotos.map((foto, index) => (
+          <View key={index} style={{ position: "relative", marginRight: 15 }}>
+            <Image source={{ uri: foto.url }} style={styles.foto} />
             <TouchableOpacity
               onPress={() => removerFoto(index)}
               style={styles.removerBotao}
             >
               <Text style={{ color: "#fff", fontWeight: "bold" }}>X</Text>
             </TouchableOpacity>
+            <Text style={{ fontSize: 10, color: "#555", marginTop: 2 }}>
+              📍 {foto.latitude.toFixed(5)}, {foto.longitude.toFixed(5)}
+            </Text>
+            <Text style={{ fontSize: 10, color: "#777" }}>
+              📅 {new Date(foto.timestamp).toLocaleString("pt-BR")}
+            </Text>
           </View>
         ))}
       </ScrollView>
@@ -252,14 +279,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   foto: {
-    width: 100,
+    width: '100%',
     height: 100,
     borderRadius: 10,
   },
   removerBotao: {
     position: "absolute",
-    top: 1,
-    right: 1,
+    top: 2,
+    right: 2,
     backgroundColor: "#e74c3c",
     width: 24,
     height: 24,

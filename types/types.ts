@@ -8,4 +8,6 @@ export type RootStackParamList = {
   FinalizarScreen: { ordemId: string }; // ✅ ADICIONE ISSO
   AssinaturaScreen: undefined;
   FinalizadasScreen: undefined;
+  CadastroScreen: undefined;
+  AdminPainelScreen:undefined;
 }

@@ -1,14 +1,12 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/types";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDoc, getDocs, doc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
-
 
 export default function TelaInicial() {
   const { user, tipo, logout } = useAuth();
@@ -17,7 +15,7 @@ export default function TelaInicial() {
 
   const [temPendentes, setTemPendentes] = useState(false);
   const [temAssinaturasPendentes, setTemAssinaturasPendentes] = useState(false);
-
+  const [nome, setNome] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -25,6 +23,23 @@ export default function TelaInicial() {
     }, [])
   );
 
+  useEffect(() => {
+    const carregarNome = async () => {
+      if (user) {
+        try {
+          const snap = await getDoc(doc(db, "usuarios", user.uid));
+          if (snap.exists()) {
+            const dados = snap.data();
+            setNome(dados?.nome || null);
+            console.log(`👤 Logado como ${dados?.nome}`);
+          }
+        } catch (err) {
+          console.warn("Erro ao buscar nome do usuário:", err);
+        }
+      }
+    };
+    carregarNome();
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -38,15 +53,14 @@ export default function TelaInicial() {
         const data = doc.data();
         return {
           ...data,
-          status: (data.status || "").toString().trim().toLowerCase(), // 🔥 garante leitura correta
+          status: (data.status || "").toString().trim().toLowerCase(),
         };
       });
 
-
-      const pendentes = ordens.filter((o) => o.status === "pendente").length > 0;
-      const aguardandoAssinatura = ordens.filter((o) => o.status === "aguardando_assinatura").length > 0;
-
-      console.log("Status das ordens:", ordens.map((o) => o.status));
+      const pendentes =
+        ordens.filter((o) => o.status === "pendente").length > 0;
+      const aguardandoAssinatura =
+        ordens.filter((o) => o.status === "aguardando_assinatura").length > 0;
 
       setTemPendentes(pendentes);
       setTemAssinaturasPendentes(aguardandoAssinatura);
@@ -55,50 +69,69 @@ export default function TelaInicial() {
     }
   };
 
-
   return (
     <View style={styles.container}>
+      {tipo === "adm" && (
+        <TouchableOpacity
+          style={styles.botaoCadastro}
+          onPress={() => navigation.navigate("CadastroScreen")}
+        >
+          <Ionicons name="person-add-outline" size={22} color="#333" />
+        </TouchableOpacity>
+      )}
       <Image
         source={require("../assets/images/logo-metest.png")}
         style={styles.logo}
         resizeMode="contain"
       />
       <Text style={styles.title}>Bem-vindo à METEST</Text>
-      <Text style={styles.info}>Olá, {user?.email}</Text>
+      <Text style={styles.info}>Olá, {nome ? nome : user?.email}</Text>
 
       <View style={styles.menu}>
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation.navigate("OrdemScreen")}
-        >
-          <Ionicons
-            name="add-circle-outline"
-            size={24}
-            color="#fff"
-            style={styles.icon}
-          />
-          <Text style={styles.menuText}>Abrir Ordem de Serviço</Text>
-        </TouchableOpacity>
+        {tipo === "adm" && (
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => navigation.navigate("OrdemScreen")}
+          >
+            <Ionicons
+              name="add-circle-outline"
+              size={24}
+              color="#fff"
+              style={styles.icon}
+            />
+            <Text style={styles.menuText}>Abrir Ordem de Serviço</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.menuButton}
           onPress={() => navigation.navigate("VisualizarScreen")}
         >
-          <Ionicons name="document-text-outline" size={24} color="#fff" style={styles.icon} />
+          <Ionicons
+            name="document-text-outline"
+            size={24}
+            color="#fff"
+            style={styles.icon}
+          />
           <Text style={styles.menuText}>OS Pendentes / Execução</Text>
           {temPendentes && <View style={styles.notificacao} />}
         </TouchableOpacity>
 
-
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={() => navigation.navigate("AssinaturaScreen")}
-        >
-          <Ionicons name="pencil" size={24} color="#fff" style={styles.icon} />
-          <Text style={styles.menuText}>Aguardando Assinatura</Text>
-          {temAssinaturasPendentes && <View style={styles.notificacao} />}
-        </TouchableOpacity>
-
+        {tipo === "adm" && (
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => navigation.navigate("AssinaturaScreen")}
+          >
+            <Ionicons
+              name="pencil"
+              size={24}
+              color="#fff"
+              style={styles.icon}
+            />
+            <Text style={styles.menuText}>Aguardando Assinatura</Text>
+            {temAssinaturasPendentes && <View style={styles.notificacao} />}
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.menuButton}
@@ -113,6 +146,7 @@ export default function TelaInicial() {
           <Text style={styles.menuText}>OS Finalizadas</Text>
         </TouchableOpacity>
       </View>
+
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Ionicons
           name="log-out-outline"
@@ -155,6 +189,21 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
   },
+  botaoCadastro: {
+    position: "absolute",
+    top: 60,
+    right: 20,
+    zIndex: 999,
+    padding: 8,
+    backgroundColor: "#ffffffcc",
+    borderRadius: 20,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 2,
+  },
+
   menuButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -206,5 +255,4 @@ const styles = StyleSheet.create({
     top: 8,
     right: 10,
   },
-
 });

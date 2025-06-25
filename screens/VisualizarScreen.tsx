@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,17 +6,26 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Image
+  Image,
+  Modal,
 } from "react-native";
-import { collection, getDocs, updateDoc, doc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  updateDoc,
+  doc,
+  deleteDoc,
+  serverTimestamp,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/types";
 import { getAuth } from "firebase/auth";
+import { useAuth } from "../context/AuthContext"; // ajuste o caminho conforme seu projeto
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-
 
 interface Ordem {
   id: string;
@@ -31,21 +40,30 @@ interface Ordem {
   fotosAntes?: string[]; // ✅ novo campo
   observacoes?: string;
   criadoEm?: any; // ✅ início (timestamp Firebase)
-  inicioExecucao?: any;  // ✅ inicio Execução
+  inicioExecucao?: any; // ✅ inicio Execução
   finalizadoEm?: any; // ✅ fim (timestamp Firebase)
   executadoPor?: string; // ✅ novo campo
 }
 
 export default function VisualizarOrdensScreen() {
+  const { user, tipo, logout } = useAuth();
   const auth = getAuth();
+  const isAdmin = tipo === "adm";
   const userEmail = auth.currentUser?.email;
-  const isAdmin = userEmail === "admin@metest.com";
 
   const [ordens, setOrdens] = useState<Ordem[]>([]);
-  const [filtroStatus, setFiltroStatus] = useState<"pendente" | "em_execucao" | "todas">("todas");
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [filtroStatus, setFiltroStatus] = useState<
+    "pendente" | "em_execucao" | "todas"
+  >("todas");
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [detalhesVisiveis, setDetalhesVisiveis] = useState<string | null>(null);
+
+  const [fotoSelecionada, setFotoSelecionada] = useState<string | null>(null);
+  const [modalFotoVisivel, setModalFotoVisivel] = useState(false);
+
+  const [nome, setNome] = useState<string | null>(null);
 
   const fetchOrdens = async () => {
     try {
@@ -69,6 +87,24 @@ export default function VisualizarOrdensScreen() {
     }, [])
   );
 
+  useEffect(() => {
+    const carregarNome = async () => {
+      if (user) {
+        try {
+          const snap = await getDoc(doc(db, "usuarios", user.uid));
+          if (snap.exists()) {
+            const dados = snap.data();
+            setNome(dados?.nome || null);
+            console.log(`👤 Logado como ${dados?.nome}`);
+          }
+        } catch (err) {
+          console.warn("Erro ao buscar nome do usuário:", err);
+        }
+      }
+    };
+    carregarNome();
+  }, [user]);
+
   const excluirOrdem = async (id: string) => {
     Alert.alert("Confirmar", "Tem certeza que deseja excluir esta ordem?", [
       { text: "Cancelar", style: "cancel" },
@@ -89,36 +125,36 @@ export default function VisualizarOrdensScreen() {
     ]);
   };
 
- const iniciarOrdem = async (id: string) => {
-  try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permissão de localização negada");
-      return;
+  const iniciarOrdem = async (id: string) => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permissão de localização negada");
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      const ordemRef = doc(db, "ordens_servico", id);
+      await updateDoc(ordemRef, {
+        status: "em_execucao",
+        inicioExecucao: serverTimestamp(),
+        executadoPor: userEmail,
+        executadoPorNome: nome, 
+        localInicio: {
+          latitude,
+          longitude,
+        },
+      });
+
+      Alert.alert("Ordem iniciada");
+      fetchOrdens();
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Erro ao iniciar ordem");
     }
-
-    const location = await Location.getCurrentPositionAsync({});
-    const { latitude, longitude } = location.coords;
-
-    const ordemRef = doc(db, "ordens_servico", id);
-    await updateDoc(ordemRef, {
-      status: "em_execucao",
-      inicioExecucao: serverTimestamp(),
-      executadoPor: userEmail,
-      localInicio: {
-        latitude,
-        longitude,
-      },
-    });
-
-    Alert.alert("Ordem iniciada");
-    fetchOrdens();
-  } catch (err) {
-    console.error(err);
-    Alert.alert("Erro ao iniciar ordem");
-  }
-};
-
+  };
 
   const toggleDetalhes = (id: string) => {
     setDetalhesVisiveis(detalhesVisiveis === id ? null : id);
@@ -128,26 +164,39 @@ export default function VisualizarOrdensScreen() {
     navigation.navigate("FinalizarScreen", { ordemId: ordem.id });
   };
 
-  const ordensFiltradas = filtroStatus === "todas"
-    ? ordens
-    : ordens.filter((ordem) => ordem.status === filtroStatus);
+  const ordensFiltradas =
+    filtroStatus === "todas"
+      ? ordens
+      : ordens.filter((ordem) => ordem.status === filtroStatus);
 
-  const contar = (status: Ordem["status"]) => ordens.filter((o) => o.status === status).length;
+  const contar = (status: Ordem["status"]) =>
+    ordens.filter((o) => o.status === status).length;
 
   const renderItem = ({ item }: { item: Ordem }) => (
-    <View style={[styles.card, item.status === "em_execucao" && styles.cardExecucao]}>
+    <View
+      style={[
+        styles.card,
+        item.status === "em_execucao" && styles.cardExecucao,
+      ]}
+    >
       <View style={styles.cardHeader}>
         <Text style={styles.numeroOrdem}>Ordem nº {item.numeroOrdem}</Text>
         <TouchableOpacity onPress={() => toggleDetalhes(item.id)}>
           <Ionicons
-            name={detalhesVisiveis === item.id ? "remove-circle-outline" : "add-circle-outline"}
+            name={
+              detalhesVisiveis === item.id
+                ? "remove-circle-outline"
+                : "add-circle-outline"
+            }
             size={26}
             color="#007bff"
           />
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.title}>{item.cliente} - {item.empresa}</Text>
+      <Text style={styles.titleCard}>
+        {item.cliente} - {item.empresa}
+      </Text>
       <Text style={styles.status}>Status: {item.status}</Text>
 
       {detalhesVisiveis === item.id && (
@@ -178,7 +227,9 @@ export default function VisualizarOrdensScreen() {
             <>
               <Text style={styles.label}>Início da Execução:</Text>
               <Text style={styles.valor}>
-                {new Date(item.inicioExecucao.seconds * 1000).toLocaleString("pt-BR")}
+                {new Date(item.inicioExecucao.seconds * 1000).toLocaleString(
+                  "pt-BR"
+                )}
               </Text>
             </>
           )}
@@ -186,40 +237,58 @@ export default function VisualizarOrdensScreen() {
           {item.executadoPor && (
             <>
               <Text style={styles.label}>Executado por:</Text>
-              <Text style={styles.valor}>{item.executadoPor}</Text>
+              <Text style={styles.valor}>{nome ? nome : user?.email}</Text>
             </>
           )}
 
           {Array.isArray(item.fotosAntes) && item.fotosAntes.length > 0 && (
             <>
-              <Text style={styles.label}>Fotos relacionadas a Ordem #{item.numeroOrdem} </Text>
+              <Text style={styles.label}>
+                Fotos relacionadas a Ordem #{item.numeroOrdem}{" "}
+              </Text>
               <View style={styles.imagensContainer}>
                 {item.fotosAntes.map((url, idx) => (
-                  <Image
+                  <TouchableOpacity
                     key={idx}
-                    source={{ uri: url }}
-                    style={styles.imagem}
-                    resizeMode="cover"
-                  />
+                    onPress={() => {
+                      setFotoSelecionada(url);
+                      setModalFotoVisivel(true);
+                    }}
+                  >
+                    <Image
+                      source={{ uri: url }}
+                      style={styles.imagem}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
                 ))}
               </View>
             </>
           )}
 
           {item.status === "pendente" && (
-            <TouchableOpacity style={styles.button} onPress={() => iniciarOrdem(item.id)}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => iniciarOrdem(item.id)}
+            >
               <Text style={styles.buttonText}>Iniciar</Text>
             </TouchableOpacity>
           )}
 
           {item.status === "em_execucao" && (
-            <TouchableOpacity style={styles.finalizarButton} onPress={() => finalizarOrdem(item)}>
+            <TouchableOpacity
+              style={styles.finalizarButton}
+              onPress={() => finalizarOrdem(item)}
+            >
               <Text style={styles.buttonText}>Finalizar</Text>
             </TouchableOpacity>
           )}
 
           {isAdmin && (
-            <TouchableOpacity style={styles.trashButton} onPress={() => excluirOrdem(item.id)}>
+            <TouchableOpacity
+              style={styles.trashButton}
+              onPress={() => excluirOrdem(item.id)}
+            >
               <Ionicons name="trash" size={22} color="#e74c3c" />
             </TouchableOpacity>
           )}
@@ -228,45 +297,95 @@ export default function VisualizarOrdensScreen() {
     </View>
   );
 
-
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Ordens de Serviço</Text>
       <View style={styles.filtros}>
         <TouchableOpacity
-          style={[styles.filtroBotao, filtroStatus === "todas" && styles.filtroAtivo]}
+          style={[
+            styles.filtroBotao,
+            filtroStatus === "todas" && styles.filtroAtivo,
+          ]}
           onPress={() => setFiltroStatus("todas")}
         >
           <Text style={styles.filtroTexto}>Todas ({ordens.length})</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.filtroBotao, filtroStatus === "pendente" && styles.filtroAtivo]}
+          style={[
+            styles.filtroBotao,
+            filtroStatus === "pendente" && styles.filtroAtivo,
+          ]}
           onPress={() => setFiltroStatus("pendente")}
         >
-          <Text style={styles.filtroTexto}>Pendentes ({contar("pendente")})</Text>
+          <Text style={styles.filtroTexto}>
+            Pendentes ({contar("pendente")})
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.filtroBotao, filtroStatus === "em_execucao" && styles.filtroAtivo]}
+          style={[
+            styles.filtroBotao,
+            filtroStatus === "em_execucao" && styles.filtroAtivo,
+          ]}
           onPress={() => setFiltroStatus("em_execucao")}
         >
-          <Text style={styles.filtroTexto}>Em Execução ({contar("em_execucao")})</Text>
+          <Text style={styles.filtroTexto}>
+            Em Execução ({contar("em_execucao")})
+          </Text>
         </TouchableOpacity>
       </View>
 
       {ordensFiltradas.length === 0 ? (
-  <View style={styles.semOrdensContainer}>
-    <Text style={styles.semOrdensTexto}>📭 Nenhuma ordem no momento.</Text>
-  </View>
-) : (
-  <FlatList
-    data={ordensFiltradas}
-    keyExtractor={(item) => item.id}
-    renderItem={renderItem}
-    contentContainerStyle={{ paddingBottom: 30 }}
-  />
-)}
+        <View style={styles.semOrdensContainer}>
+          <Text style={styles.semOrdensTexto}>
+            📭 Nenhuma ordem no momento.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={ordensFiltradas}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 30 }}
+        />
+      )}
 
+      {modalFotoVisivel && fotoSelecionada && (
+        <Modal visible={modalFotoVisivel} transparent animationType="fade">
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.9)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                position: "absolute",
+                top: 90,
+                right: 30,
+                backgroundColor: "#e74c3c",
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 8,
+              }}
+              onPress={() => {
+                setModalFotoVisivel(false);
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Fechar</Text>
+            </TouchableOpacity>
+
+            <Image
+              source={{ uri: fotoSelecionada }}
+              style={{ width: "90%", height: "70%", borderRadius: 10 }}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -276,6 +395,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f9f9f9",
     padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#333",
   },
   card: {
     backgroundColor: "#fff",
@@ -302,7 +428,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#555",
   },
-  title: {
+  titleCard: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 6,
@@ -371,7 +497,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     marginBottom: 16,
     flexWrap: "wrap",
-    gap: 8,
+    gap: 2,
   },
   filtroBotao: {
     paddingVertical: 8,
@@ -387,19 +513,15 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   semOrdensContainer: {
-  flex: 1,
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingTop: 50,
-},
-semOrdensTexto: {
-  fontSize: 16,
-  color: '#555',
-  textAlign: 'center',
-  lineHeight: 24,
-},
-
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 50,
+  },
+  semOrdensTexto: {
+    fontSize: 16,
+    color: "#555",
+    textAlign: "center",
+    lineHeight: 24,
+  },
 });
-
-
-

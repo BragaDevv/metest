@@ -14,6 +14,7 @@ import {
   getDocs,
   updateDoc,
   doc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,7 +22,14 @@ import { getAuth } from "firebase/auth";
 import SignatureScreen from "react-native-signature-canvas";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
+import { useAuth } from "@context/AuthContext";
 
+interface FotoOrdem {
+  url: string;
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+}
 
 interface Ordem {
   id: string;
@@ -31,9 +39,11 @@ interface Ordem {
   localizacao: string;
   status: "pendente" | "em_execucao" | "finalizada" | "aguardando_assinatura";
   numeroOrdem?: string;
+  executadoPorNome:string;
   assinatura_cliente?: string;
   assinatura_metest?: string;
-  fotosDepois?: string[];
+  assinatura_metest_nome: string;
+  fotosDepois?: FotoOrdem[];
   fotosAntes?: string[];
   descricaoFinal?: string;
   observacoes?: string;
@@ -48,15 +58,19 @@ interface Ordem {
 }
 
 export default function AguardandoAssinaturaScreen() {
+  const { user, tipo, logout } = useAuth();
   const [ordensAguardando, setOrdensAguardando] = useState<Ordem[]>([]);
   const auth = getAuth();
   const userEmail = auth.currentUser?.email;
-  const isAdmin = userEmail === "admin@metest.com";
   const [detalhesVisiveis, setDetalhesVisiveis] = useState<string | null>(null);
 
-  const [assinaturaVisivel, setAssinaturaVisivel] = useState<string | null>(null);
+  const [assinaturaVisivel, setAssinaturaVisivel] = useState<string | null>(
+    null
+  );
   const [assinaturaTemp, setAssinaturaTemp] = useState<string | null>(null);
-  const [assinaturaCapturadaPara, setAssinaturaCapturadaPara] = useState<string | null>(null);
+  const [assinaturaCapturadaPara, setAssinaturaCapturadaPara] = useState<
+    string | null
+  >(null);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [localSelecionado, setLocalSelecionado] = useState<{
@@ -65,26 +79,53 @@ export default function AguardandoAssinaturaScreen() {
     localizacao: string;
   } | null>(null);
 
+  const [fotoSelecionada, setFotoSelecionada] = useState<string | null>(null);
+  const [coordenadasSelecionadas, setCoordenadasSelecionadas] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [modalFotoVisivel, setModalFotoVisivel] = useState(false);
+  const [timestampSelecionado, setTimestampSelecionado] = useState<
+    number | null
+  >(null);
+
+  const [nome, setNome] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAdmin) {
-      Alert.alert("Acesso negado", "Apenas administradores podem acessar esta tela.");
-    } else {
-      fetchOrdensAguardando();
-    }
+    fetchOrdensAguardando();
   }, []);
+
+  useEffect(() => {
+    const carregarNome = async () => {
+      if (user) {
+        try {
+          const snap = await getDoc(doc(db, "usuarios", user.uid));
+          if (snap.exists()) {
+            const dados = snap.data();
+            setNome(dados?.nome || null);
+            console.log(`👤 Logado como ${dados?.nome}`);
+          }
+        } catch (err) {
+          console.warn("Erro ao buscar nome do usuário:", err);
+        }
+      }
+    };
+    carregarNome();
+  }, [user]);
 
   const fetchOrdensAguardando = async () => {
     try {
       const snapshot = await getDocs(collection(db, "ordens_servico"));
-      const aguardando = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          ...data,
-          localInicio: data.localInicio ?? null, // <-- garante estrutura
-        } as Ordem;
-      }).filter((ordem) => ordem.status === "aguardando_assinatura");
+      const aguardando = snapshot.docs
+        .map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            ...data,
+            localInicio: data.localInicio ?? null, // <-- garante estrutura
+          } as Ordem;
+        })
+        .filter((ordem) => ordem.status === "aguardando_assinatura");
 
       setOrdensAguardando(aguardando);
     } catch (err) {
@@ -104,22 +145,36 @@ export default function AguardandoAssinaturaScreen() {
 
   const renderItem = ({ item }: { item: Ordem }) => (
     <View style={styles.card}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <Text style={styles.numeroOrdem}>Ordem nº {item.numeroOrdem}</Text>
         <TouchableOpacity onPress={() => toggleDetalhes(item.id)}>
           <Ionicons
-            name={detalhesVisiveis === item.id ? "remove-circle-outline" : "add-circle-outline"}
+            name={
+              detalhesVisiveis === item.id
+                ? "remove-circle-outline"
+                : "add-circle-outline"
+            }
             size={24}
             color="#007bff"
           />
         </TouchableOpacity>
       </View>
-      <Text style={styles.title}>{item.cliente} - {item.empresa}</Text>
+      <Text style={styles.titleCard}>
+        {item.cliente} - {item.empresa}
+      </Text>
       <Text style={styles.status}>Status: {item.status}</Text>
 
       {detalhesVisiveis === item.id && (
         <View style={{ marginTop: 8, gap: 8 }}>
-          <Text><Text style={styles.label}>Descrição:</Text> {item.descricao}</Text>
+          <Text>
+            <Text style={styles.label}>Descrição:</Text> {item.descricao}
+          </Text>
 
           {Array.isArray(item.fotosAntes) && item.fotosAntes.length > 0 && (
             <View>
@@ -129,7 +184,12 @@ export default function AguardandoAssinaturaScreen() {
                   <Image
                     key={idx}
                     source={{ uri: url }}
-                    style={{ width: 100, height: 100, borderRadius: 6, backgroundColor: "#eee" }}
+                    style={{
+                      width: 100,
+                      height: 100,
+                      borderRadius: 6,
+                      backgroundColor: "#eee",
+                    }}
                     resizeMode="cover"
                   />
                 ))}
@@ -137,64 +197,119 @@ export default function AguardandoAssinaturaScreen() {
             </View>
           )}
 
-          <Text><Text style={styles.label}>Localização:</Text> {item.localizacao}</Text>
+          <Text>
+            <Text style={styles.label}>Localização:</Text> {item.localizacao}
+          </Text>
 
           <View style={styles.containerService}>
             {item.descricaoFinal && (
-              <Text><Text style={styles.label}>Serviço Realizado:</Text> {item.descricaoFinal}</Text>
+              <Text>
+                <Text style={styles.label}>Serviço Realizado:</Text>{" "}
+                {item.descricaoFinal}
+              </Text>
             )}
 
             {item.observacoes && (
-              <Text><Text style={styles.label}>Observações:</Text> {item.observacoes}</Text>
+              <Text>
+                <Text style={styles.label}>Observações:</Text>{" "}
+                {item.observacoes}
+              </Text>
             )}
 
             {Array.isArray(item.fotosDepois) && item.fotosDepois.length > 0 ? (
               <View>
                 <Text style={styles.label}>Fotos - Serviço Realizado:</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                  {item.fotosDepois.map((url, index) => (
-                    <Image
+                <View
+                  style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}
+                >
+                  {item.fotosDepois.map((foto, index) => (
+                    <TouchableOpacity
                       key={index}
-                      source={{ uri: url }}
-                      style={{ width: 100, height: 100, borderRadius: 6, backgroundColor: "#eee" }}
-                      resizeMode="cover"
-                    />
+                      onPress={() => {
+                        setFotoSelecionada(foto.url);
+                        setCoordenadasSelecionadas({
+                          lat: foto.latitude,
+                          lng: foto.longitude,
+                        });
+                        setTimestampSelecionado(foto.timestamp);
+                        setModalFotoVisivel(true);
+                      }}
+                    >
+                      <Image
+                        source={{ uri: foto.url }}
+                        style={{
+                          width: 100,
+                          height: 100,
+                          borderRadius: 6,
+                          backgroundColor: "#eee",
+                        }}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
                   ))}
                 </View>
               </View>
             ) : (
-              <Text style={{ fontStyle: "italic", color: "#666" }}>Não há fotos em anexo.</Text>
+              <Text style={{ fontStyle: "italic", color: "#666" }}>
+                Não há fotos em anexo.
+              </Text>
             )}
 
             {item.criadoEm && (
-              <Text><Text style={styles.label}>Abertura:</Text> {new Date(item.criadoEm.seconds * 1000).toLocaleString("pt-BR")}</Text>
+              <Text>
+                <Text style={styles.label}>Abertura:</Text>{" "}
+                {new Date(item.criadoEm.seconds * 1000).toLocaleString("pt-BR")}
+              </Text>
             )}
-            {item.executadoPor && (
-              <Text><Text style={styles.label}>Executado por:</Text> {item.executadoPor}</Text>
+            {item.executadoPorNome && (
+              <Text>
+                <Text style={styles.label}>Executado por:</Text>
+                <Text> {item.executadoPorNome}</Text>
+              </Text>
             )}
             {item.inicioExecucao && (
-              <Text><Text style={styles.label}>Início da Execução:</Text> {new Date(item.inicioExecucao.seconds * 1000).toLocaleString("pt-BR")}</Text>
+              <Text>
+                <Text style={styles.label}>Início da Execução:</Text>{" "}
+                {new Date(item.inicioExecucao.seconds * 1000).toLocaleString(
+                  "pt-BR"
+                )}
+              </Text>
             )}
             {item.finalizadoEm && (
-              <Text><Text style={styles.label}>Finalizado em:</Text> {new Date(item.finalizadoEm.seconds * 1000).toLocaleString("pt-BR")}</Text>
+              <Text>
+                <Text style={styles.label}>Finalizado em:</Text>{" "}
+                {new Date(item.finalizadoEm.seconds * 1000).toLocaleString(
+                  "pt-BR"
+                )}
+              </Text>
             )}
 
             {item.localInicio && (
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginTop: 6,
+                }}
+              >
                 <Text>
                   <Text style={styles.label}>Localização do Executante:</Text>{" "}
                   {item.localInicio.latitude.toFixed(5)}
                   {item.localInicio.longitude.toFixed(5)}
                 </Text>
                 <TouchableOpacity
-                  style={{ position: 'relative', left: -100, top: 4 }}
+                  style={{ position: "relative", left: -100, top: 4 }}
                   onPress={async () => {
-                    if (item.localInicio?.latitude && item.localInicio?.longitude) {
+                    if (
+                      item.localInicio?.latitude &&
+                      item.localInicio?.longitude
+                    ) {
                       try {
-                        const enderecoResult = await Location.reverseGeocodeAsync({
-                          latitude: item.localInicio.latitude,
-                          longitude: item.localInicio.longitude,
-                        });
+                        const enderecoResult =
+                          await Location.reverseGeocodeAsync({
+                            latitude: item.localInicio.latitude,
+                            longitude: item.localInicio.longitude,
+                          });
 
                         const enderecoLegivel = enderecoResult[0]
                           ? `${enderecoResult[0].street}, ${enderecoResult[0].district}, ${enderecoResult[0].city} - ${enderecoResult[0].region}`
@@ -212,49 +327,69 @@ export default function AguardandoAssinaturaScreen() {
                         Alert.alert("Erro ao obter endereço do executante");
                       }
                     } else {
-                      Alert.alert("Localização indisponível", "Esta ordem não possui coordenadas do executante.");
+                      Alert.alert(
+                        "Localização indisponível",
+                        "Esta ordem não possui coordenadas do executante."
+                      );
                     }
                   }}
-
                 >
-                  <Ionicons name="add-circle-outline" size={22} color="#007bff" />
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={22}
+                    color="#007bff"
+                  />
                 </TouchableOpacity>
               </View>
             )}
-
-
-
           </View>
           {item.assinatura_cliente ? (
             <View>
               <Text style={styles.label}>Assinatura do Cliente:</Text>
               <Image
                 source={{ uri: getAssinaturaUri(item.assinatura_cliente) }}
-                style={{ width: 200, height: 100, borderRadius: 6, marginTop: 6, backgroundColor: "#eee" }}
+                style={{
+                  width: 200,
+                  height: 100,
+                  borderRadius: 6,
+                  marginTop: 6,
+                  backgroundColor: "#eee",
+                }}
                 resizeMode="contain"
               />
             </View>
           ) : (
-            <Text style={{ fontStyle: "italic", color: "#666" }}>Sem assinatura do Cliente.</Text>
+            <Text style={{ fontStyle: "italic", color: "#666" }}>
+              Sem assinatura do Cliente.
+            </Text>
           )}
 
-          {(item.assinatura_metest || (item.id === assinaturaCapturadaPara && assinaturaTemp)) ? (
+          {item.assinatura_metest ||
+          (item.id === assinaturaCapturadaPara && assinaturaTemp) ? (
             <View>
               <Text style={styles.label}>Assinatura Metest:</Text>
               <Image
                 source={{
-                  uri: item.id === assinaturaCapturadaPara && assinaturaTemp
-                    ? assinaturaTemp
-                    : getAssinaturaUri(item.assinatura_metest),
+                  uri:
+                    item.id === assinaturaCapturadaPara && assinaturaTemp
+                      ? assinaturaTemp
+                      : getAssinaturaUri(item.assinatura_metest),
                 }}
-                style={{ width: 200, height: 100, borderRadius: 6, marginTop: 6, backgroundColor: "#eee" }}
+                style={{
+                  width: 200,
+                  height: 100,
+                  borderRadius: 6,
+                  marginTop: 6,
+                  backgroundColor: "#eee",
+                }}
                 resizeMode="contain"
               />
             </View>
           ) : (
-            <Text style={{ fontStyle: "italic", color: "#666" }}>Sem assinatura ADM.</Text>
+            <Text style={{ fontStyle: "italic", color: "#666" }}>
+              Sem assinatura ADM.
+            </Text>
           )}
-
         </View>
       )}
 
@@ -266,6 +401,7 @@ export default function AguardandoAssinaturaScreen() {
               await updateDoc(doc(db, "ordens_servico", item.id), {
                 status: "finalizada",
                 assinatura_metest: assinaturaTemp,
+                assinatura_metest_nome: nome,
                 finalizadoEm: new Date(),
               });
               setAssinaturaTemp(null);
@@ -296,21 +432,14 @@ export default function AguardandoAssinaturaScreen() {
     </View>
   );
 
-  if (!isAdmin) {
-    return (
-      <View style={styles.container}>
-        <Text style={{ color: 'red', fontWeight: 'bold', textAlign: 'center' }}>
-          Acesso restrito: somente administradores podem ver esta tela.
-        </Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Aguardando Assinatura</Text>
       {ordensAguardando.length === 0 ? (
         <View style={styles.semOrdensContainer}>
-          <Text style={styles.semOrdensTexto}>📭 Nenhuma ordem aguardando assinatura no momento.</Text>
+          <Text style={styles.semOrdensTexto}>
+            📭 Nenhuma ordem aguardando assinatura no momento.
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -321,13 +450,15 @@ export default function AguardandoAssinaturaScreen() {
         />
       )}
 
-
       <Modal visible={!!assinaturaVisivel} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>✍️ Assine abaixo</Text>
-              <TouchableOpacity onPress={() => setAssinaturaVisivel(null)} style={styles.modalCloseBtn}>
+              <TouchableOpacity
+                onPress={() => setAssinaturaVisivel(null)}
+                style={styles.modalCloseBtn}
+              >
                 <Text style={styles.modalCloseText}>Fechar</Text>
               </TouchableOpacity>
             </View>
@@ -350,11 +481,15 @@ export default function AguardandoAssinaturaScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitleMaps}>Localização do Executante</Text>
+              <Text style={styles.modalTitleMaps}>
+                Localização do Executante
+              </Text>
               {localSelecionado && (
                 <>
                   {localSelecionado?.localizacao && (
-                    <Text style={styles.modalEndereco}>{localSelecionado.localizacao}</Text>
+                    <Text style={styles.modalEndereco}>
+                      {localSelecionado.localizacao}
+                    </Text>
                   )}
                   <MapView
                     style={styles.modalMap}
@@ -380,13 +515,95 @@ export default function AguardandoAssinaturaScreen() {
                 style={styles.modalCloseButton}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>Fechar</Text>
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Fechar
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
+      <Modal visible={modalFotoVisivel} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.9)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {fotoSelecionada && (
+            <View style={{ width: "90%", height: "70%", position: "relative" }}>
+              <Image
+                source={{ uri: fotoSelecionada }}
+                style={{ width: "100%", height: "100%", borderRadius: 10 }}
+                resizeMode="contain"
+              />
+              {coordenadasSelecionadas && (
+                <Text
+                  style={{
+                    position: "absolute",
+                    bottom: 70,
+                    left: 12,
+                    color: "#000",
+                    backgroundColor: "#fff",
+                    paddingHorizontal: 5,
+                    paddingVertical: 4,
+                    borderRadius: 0,
+                    fontSize: 12,
+                  }}
+                >
+                  {coordenadasSelecionadas.lat.toFixed(5)},{" "}
+                  {coordenadasSelecionadas.lng.toFixed(5)}
+                </Text>
+              )}
+              {timestampSelecionado && (
+                <Text
+                  style={{
+                    position: "absolute",
+                    bottom: 70,
+                    left: 150,
+                    color: "#000",
+                    backgroundColor: "#fff",
+                    paddingHorizontal: 5,
+                    paddingVertical: 4,
+                    borderRadius: 0,
+                    fontSize: 12,
+                  }}
+                >
+                  {new Date(timestampSelecionado).toLocaleString("pt-BR")}
+                </Text>
+              )}
+              <TouchableOpacity
+                style={{
+                  position: "absolute",
+                  top: 20,
+                  right: 20,
+                  backgroundColor: "#e74c3c",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                }}
+                onPress={() => {
+                  setModalFotoVisivel(false);
+                  setFotoSelecionada(null);
+                  setCoordenadasSelecionadas(null);
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Fechar
+                </Text>
+              </TouchableOpacity>
+              <Image
+                source={require("../assets/images/logo-metest.png")}
+                style={styles.logoFoto}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -396,6 +613,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f2f2f2",
     padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#333",
   },
   card: {
     backgroundColor: "#fff",
@@ -414,7 +638,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#444",
   },
-  title: {
+  titleCard: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#222",
@@ -446,44 +670,44 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContainer: {
-    width: '90%',
-    height: '50%',
-    backgroundColor: 'white',
+    width: "90%",
+    height: "50%",
+    backgroundColor: "white",
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#007bff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#007bff",
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   modalTitle: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#fff",
+    fontWeight: "bold",
     fontSize: 16,
   },
   modalTitleMaps: {
-    color: '#000',
-    fontWeight: 'bold',
+    color: "#000",
+    fontWeight: "bold",
     fontSize: 16,
   },
   modalCloseBtn: {
-    backgroundColor: '#dc3545',
+    backgroundColor: "#dc3545",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 6,
   },
   modalCloseText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#fff",
+    fontWeight: "bold",
   },
   containerService: {
     marginVertical: 10,
@@ -494,14 +718,14 @@ const styles = StyleSheet.create({
   },
   semOrdensContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingTop: 50,
   },
   semOrdensTexto: {
     fontSize: 16,
-    color: '#555',
-    textAlign: 'center',
+    color: "#555",
+    textAlign: "center",
     lineHeight: 24,
   },
   modalContent: {
@@ -529,7 +753,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 8,
   },
-
-
-
+  logoFoto: {
+    position: "absolute",
+    bottom: "74%",
+    left: "3%",
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+  },
 });
