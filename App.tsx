@@ -1,9 +1,16 @@
-import React from "react";
+// App.tsx
+import React, { useEffect, useRef, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { AuthProvider } from "./context/AuthContext";
+import { Platform } from "react-native";
+import * as Notifications from "expo-notifications";
+import Toast from "react-native-toast-message";
 
-import { RootStackParamList } from "types/types";
+import { AuthProvider } from "./context/AuthContext";
+import registerForPushNotifications from "./services/registerForPushNotifications";
+import { saveExpoPushToken } from "./services/pushTokenStorage";
+
+import { RootStackParamList } from "./types/types";
 import LoginScreen from "./screens/LoginScreen";
 import InicialScreen from "./screens/InicialScreen";
 import OrdemScreen from "./screens/OrdemScreen";
@@ -16,7 +23,55 @@ import AdminPainelScreen from "@screens/AdminPainelScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
 export default function App() {
+  const notificationListener = useRef<Notifications.Subscription | null>(null);
+  const responseListener = useRef<Notifications.Subscription | null>(null);
+
+  useEffect(() => {
+    const setupNotifications = async () => {
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          sound: "default",
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FF231F7C",
+        });
+      }
+
+      notificationListener.current =
+        Notifications.addNotificationReceivedListener((notification) => {
+          Toast.show({
+            type: "info",
+            text1: notification.request.content.title ?? "Nova notificação",
+            text2: notification.request.content.body ?? "",
+          });
+        });
+
+      responseListener.current =
+        Notifications.addNotificationResponseReceivedListener((response) => {
+          console.log("[APP] Notificação clicada:", response);
+        });
+
+      return () => {
+        notificationListener.current?.remove();
+        responseListener.current?.remove();
+      };
+    };
+
+    setupNotifications();
+  }, []);
+
+
   return (
     <AuthProvider>
       <NavigationContainer>

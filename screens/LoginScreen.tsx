@@ -9,11 +9,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/types";
+import { signInWithEmailAndPassword, getAuth } from "firebase/auth";
+import registerForPushNotifications from "../services/registerForPushNotifications";
+import { saveExpoPushToken } from "../services/pushTokenStorage";
+import { auth } from "firebaseConfig";
 
 export default function LoginScreen() {
   const { login, loading } = useAuth();
@@ -24,12 +29,20 @@ export default function LoginScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleLogin = async () => {
-    setErro("");
     try {
-      await login(email, password);
-      navigation.reset({ index: 0, routes: [{ name: "InicialScreen" }] });
-    } catch (err: any) {
-      setErro("Credenciais inválidas");
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log("✅ Login realizado:", userCredential.user.uid);
+
+      const token = await registerForPushNotifications();
+      if (token) {
+        await saveExpoPushToken(token); // Agora salvo com o user.uid disponível
+      }
+
+      navigation.replace("InicialScreen"); // ou sua tela principal
+
+    } catch (error: any) {
+      console.error("Erro ao logar:", error);
+      Alert.alert("Erro ao logar", error.message);
     }
   };
 

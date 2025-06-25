@@ -37,7 +37,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           "Precisamos da sua localização para registrar corretamente o início da ordem de serviço.",
       },
     },
-    extra: {},
+    extra: {
+      eas: {
+        projectId: "ec4a3ae6-c127-44af-84f5-71d37adb7cff",
+      },
+    },
     runtimeVersion: {
       policy: "sdkVersion",
     },

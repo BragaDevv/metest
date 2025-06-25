@@ -1,6 +1,7 @@
 // services/registerForPushNotifications.ts
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 export default async function registerForPushNotifications(): Promise<string | undefined> {
@@ -28,12 +29,13 @@ export default async function registerForPushNotifications(): Promise<string | u
 
     console.log("[NOTIF] Permissão concedida, obtendo token...");
 
-    const tokenResponse = await Notifications.getExpoPushTokenAsync();
+    const tokenResponse = await Notifications.getExpoPushTokenAsync({
+      projectId: Constants?.expoConfig?.extra?.projectId, // ✅ necessário
+    });
     const token = tokenResponse.data;
 
     console.log("[NOTIF] Token de push gerado:", token);
 
-    // Android: cria canal de notificação
     if (Platform.OS === "android") {
       console.log("[NOTIF] Configurando canal de notificação para Android...");
       await Notifications.setNotificationChannelAsync("default", {

@@ -3,16 +3,12 @@ import { db } from "../firebaseConfig";
 import * as Device from "expo-device";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { getAuth } from "firebase/auth";
 
-// Gera um ID aleatório simples (compatível com Expo Go e builds)
 function generateRandomId() {
-  return (
-    Date.now().toString(36) +
-    Math.random().toString(36).substring(2, 10)
-  );
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
 }
 
-// Gera ou obtém um ID persistente para o dispositivo
 async function getDeviceId(): Promise<string> {
   let deviceId = await SecureStore.getItemAsync("device_id");
   if (!deviceId) {
@@ -25,7 +21,6 @@ async function getDeviceId(): Promise<string> {
   return deviceId;
 }
 
-// Valida se é um Expo Push Token válido
 function isValidExpoPushToken(token: string): boolean {
   return typeof token === "string" && token.startsWith("ExponentPushToken[");
 }
@@ -42,19 +37,28 @@ export async function saveExpoPushToken(token: string, extraData: Record<string,
     const deviceId = await getDeviceId();
 
     const dataToSave = {
-      token,
       updatedAt: serverTimestamp(),
-      platform: Platform.OS,
-      deviceName: Device.deviceName || null,
+      platform: Platform.OS || "unknown",
+      deviceName: Device.deviceName?.toString().slice(0, 50) || "Desconhecido",
+      deviceId,
       ...extraData,
     };
 
-    console.log("[TOKEN] Dados prontos para salvar:", { deviceId, ...dataToSave });
+    const user = getAuth().currentUser;
+    if (!user || !user.uid) {
+      console.warn("[TOKEN] Usuário não autenticado. Token não será salvo.");
+      return;
+    }
 
-    await setDoc(doc(db, "pushTokens", deviceId), dataToSave);
+    await setDoc(doc(db, "usuarios", user.uid), {
+      expoPushToken: token,
+      ...dataToSave,
+    }, { merge: true });
 
-    console.log("[TOKEN] Token salvo com sucesso no Firestore para:", deviceId);
+    console.log("[TOKEN] Token salvo com sucesso para UID:", user.uid);
   } catch (error) {
     console.error("[TOKEN] Erro ao salvar token:", error);
   }
 }
+
+export { getDeviceId };
