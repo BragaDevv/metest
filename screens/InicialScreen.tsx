@@ -16,7 +16,7 @@ import { collection, getDoc, getDocs, doc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 export default function TelaInicial() {
-  const { user, tipo, logout } = useAuth();
+  const { user, tipo, loading, logout } = useAuth();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 

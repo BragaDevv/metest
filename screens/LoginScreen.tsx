@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useNavigation } from "@react-navigation/native";
@@ -21,13 +20,22 @@ import { saveExpoPushToken } from "../services/pushTokenStorage";
 import { auth } from "firebaseConfig";
 
 export default function LoginScreen() {
-  const { login, loading } = useAuth();
+  const { login, loading, tipo } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [erro, setErro] = useState("");
 
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const jaRedirecionou = useRef(false);
+
+  useEffect(() => {
+    if (tipo && !jaRedirecionou.current) {
+      jaRedirecionou.current = true;
+      navigation.replace("InicialScreen");
+    }
+  }, [tipo]);
 
   const handleLogin = async () => {
     const trimmedEmail = email.trim();
@@ -52,11 +60,7 @@ export default function LoginScreen() {
       }
 
       setErro("");
-
-      // Solução com fallback
-      setTimeout(() => {
-        navigation.replace("InicialScreen");
-      }, 100);
+      // Agora o redirecionamento ocorre automaticamente no useEffect após tipo carregar
     } catch (error: any) {
       console.error("Erro ao logar:", error);
       let mensagem = "Erro ao tentar fazer login.";
@@ -68,7 +72,6 @@ export default function LoginScreen() {
       setErro(mensagem);
     }
   };
-
 
   return (
     <KeyboardAvoidingView

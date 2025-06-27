@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
@@ -8,11 +14,11 @@ import {
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
 
-// METEST: controla usuários por tipo ('adm' ou 'funcionario') salvo no Firestore
+type TipoUsuario = "adm" | "funcionario";
 
 type AuthContextType = {
   user: User | null;
-  tipo: "adm" | "funcionario" | null;
+  tipo: TipoUsuario | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -24,24 +30,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [tipo, setTipo] = useState<"adm" | "funcionario" | null>(null);
+  const [tipo, setTipo] = useState<TipoUsuario | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const tipoFoiCarregadoNoLogin = useRef(false);
+
+  const isTipoValido = (value: any): value is TipoUsuario => {
+    return value === "adm" || value === "funcionario";
+  };
+
+  // ⏬ Listener do Firebase Auth
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
         setUser(null);
         setTipo(null);
-        return setLoading(false);
+        setLoading(false);
+        return;
       }
 
       setUser(firebaseUser);
 
+      // Evita sobrescrever se já foi definido via login()
+      if (tipoFoiCarregadoNoLogin.current) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const snap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
-        const userTipo = snap.exists() ? snap.data()?.tipo : null;
-        setTipo(userTipo);
-        console.log(`👤 ${firebaseUser.email} | Tipo: ${userTipo}`);
+        const data = snap.data();
+        const rawTipo = data?.tipo;
+
+        console.log("📦 Dados do usuário (onAuthStateChanged):", data);
+
+        if (isTipoValido(rawTipo)) {
+          setTipo(rawTipo);
+          console.log(`👤 Tipo detectado automaticamente: ${rawTipo}`);
+        } else {
+          setTipo(null);
+          console.warn("⚠️ Tipo inválido encontrado:", rawTipo);
+        }
       } catch (error) {
         console.warn("⚠️ Erro ao buscar tipo do usuário:", error);
         setTipo(null);
@@ -53,18 +82,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return unsubscribe;
   }, []);
 
+  // ⏬ Login manual
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const uid = result.user.uid;
 
-      const snap = await getDoc(doc(db, "usuarios", uid));
-      const userTipo = snap.exists() ? snap.data()?.tipo : null;
-      setUser(result.user);
-      setTipo(userTipo);
+      // ✅ Pequeno delay para garantir propagação do Firestore
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      console.log(`👤 ${result.user.email} | Tipo: ${userTipo}`);
+      const snap = await getDoc(doc(db, "usuarios", uid));
+      const data = snap.data();
+
+      console.log("📦 Dados do usuário (login):", data);
+
+      const rawTipo = data?.tipo;
+
+      setUser(result.user);
+
+      if (isTipoValido(rawTipo)) {
+        setTipo(rawTipo);
+        tipoFoiCarregadoNoLogin.current = true;
+        console.log(`✅ Tipo carregado manualmente: ${rawTipo}`);
+      } else {
+        setTipo(null);
+        console.warn("⚠️ Tipo inválido encontrado no login:", rawTipo);
+      }
     } catch (error) {
       console.error("Erro no login:", error);
       throw error;
@@ -73,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+
   const logout = async () => {
     setLoading(true);
     try {
@@ -80,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } finally {
       setUser(null);
       setTipo(null);
+      tipoFoiCarregadoNoLogin.current = false;
       setLoading(false);
     }
   };

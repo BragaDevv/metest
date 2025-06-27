@@ -29,6 +29,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/types";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 
 export default function AbrirOrdemServicoScreen() {
   const [cliente, setCliente] = useState("");
@@ -72,96 +73,122 @@ export default function AbrirOrdemServicoScreen() {
     return `${cepNumeros.slice(0, 5)}-${cepNumeros.slice(5, 8)}`;
   };
 
-  const requestCameraPermission = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permissão negada", "Você precisa permitir o uso da câmera.");
-      return false;
-    }
-    return true;
+  const uploadToCloudinary = async (uri: string): Promise<string> => {
+    const data = new FormData();
+    data.append("file", {
+      uri,
+      name: "imagem.jpg",
+      type: "image/jpeg",
+    } as any);
+    data.append("upload_preset", "mndd_unsigned");
+    data.append("cloud_name", "dy48gdjlv");
+
+    const res = await fetch("https://api.cloudinary.com/v1_1/dy48gdjlv/image/upload", {
+      method: "POST",
+      body: data,
+    });
+
+    const json = await res.json();
+    return json.secure_url;
   };
 
-  const handlePickImage = async () => {
-    if (Platform.OS === "web") {
-      try {
-        setLoadingImagem(true);
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.5,
-        });
 
-        if (!result.canceled && result.assets.length > 0) {
-          setFotos((prev) => [...prev, result.assets[0].uri]);
-        }
-      } catch (error) {
-        console.error("Erro ao selecionar imagem na web:", error);
-        alert("Erro ao selecionar imagem.");
-      } finally {
-        setLoadingImagem(false);
+  const handlePickMultipleImages = async () => {
+    const requestCameraPermission = async () => {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permissão negada", "Você precisa permitir o uso da câmera.");
+        return false;
       }
-    } else {
-      Alert.alert(
-        "Selecionar Imagem",
-        "Escolha a origem da imagem:",
-        [
-          {
-            text: "Câmera",
-            onPress: async () => {
-              const temPermissao = await requestCameraPermission();
-              if (!temPermissao) return;
+      return true;
+    };
 
-              try {
-                setLoadingImagem(true);
-                const cameraResult = await ImagePicker.launchCameraAsync({
-                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                  quality: 0.5,
-                });
+    Alert.alert(
+      "Selecionar Imagem",
+      "Escolha a origem das imagens:",
+      [
+        {
+          text: "Câmera",
+          onPress: async () => {
+            const permitido = await requestCameraPermission();
+            if (!permitido) return;
 
-                if (!cameraResult.canceled && cameraResult.assets.length > 0) {
-                  setFotos((prev) => [...prev, cameraResult.assets[0].uri]);
-                }
-              } catch (error) {
-                console.error("Erro ao abrir a câmera:", error);
-                Alert.alert("Erro ao abrir a câmera");
-              } finally {
-                setLoadingImagem(false);
-              }
-            },
-          },
-          {
-            text: "Galeria",
-            onPress: async () => {
-              try {
-                setLoadingImagem(true);
-                const galleryResult = await ImagePicker.launchImageLibraryAsync(
-                  {
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    quality: 0.5,
-                  }
+            try {
+              setLoadingImagem(true);
+
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.6,
+              });
+
+              if (!result.canceled && result.assets.length > 0) {
+                const resized = await ImageManipulator.manipulateAsync(
+                  result.assets[0].uri,
+                  [{ resize: { width: 800 } }],
+                  { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
                 );
 
-                if (
-                  !galleryResult.canceled &&
-                  galleryResult.assets.length > 0
-                ) {
-                  setFotos((prev) => [...prev, galleryResult.assets[0].uri]);
-                }
-              } catch (error) {
-                Alert.alert("Erro ao acessar a galeria");
-              } finally {
-                setLoadingImagem(false);
+                const cloudUrl = await uploadToCloudinary(resized.uri);
+                setFotos((prev) => [...prev, cloudUrl]);
               }
-            },
+            } catch (err) {
+              console.error("Erro com câmera:", err);
+              Alert.alert("Erro ao tirar foto.");
+            } finally {
+              setLoadingImagem(false);
+            }
           },
-          {
-            text: "Cancelar",
-            style: "cancel",
+        },
+        {
+          text: "Galeria",
+          onPress: async () => {
+            try {
+              setLoadingImagem(true);
+
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: true,
+                quality: 0.6,
+              });
+
+              if (!result.canceled && result.assets.length > 0) {
+                const uris = result.assets.map((a) => a.uri);
+
+                const resizedUploads = await Promise.all(
+                  uris.map((uri) =>
+                    ImageManipulator.manipulateAsync(
+                      uri,
+                      [{ resize: { width: 800 } }],
+                      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+                    )
+                  )
+                );
+
+                const uploadedUrls = await Promise.all(
+                  resizedUploads.map((r) => uploadToCloudinary(r.uri))
+                );
+
+                setFotos((prev) => [...prev, ...uploadedUrls]);
+              }
+            } catch (err) {
+              console.error("Erro na galeria:", err);
+              Alert.alert("Erro ao selecionar imagens.");
+            } finally {
+              setLoadingImagem(false);
+            }
           },
-        ],
-        { cancelable: true }
-      );
-    }
+        },
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
   };
+
+
+
 
   const handleRemoveImage = (indexToRemove: number) => {
     setFotos((prev) => prev.filter((_, index) => index !== indexToRemove));
@@ -235,6 +262,7 @@ export default function AbrirOrdemServicoScreen() {
     >
 
       <ScrollView contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title}>Nova Ordem de Serviço</Text>
 
@@ -257,7 +285,11 @@ export default function AbrirOrdemServicoScreen() {
 
         <Text style={styles.label}>Descrição do Serviço:</Text>
         <TextInput
-          style={[styles.input, { height: 100 }]}
+          style={[styles.input, {
+            minHeight: 70, maxHeight: 70, maxWidth: 360, textAlignVertical: "top", ...(Platform.OS === "web" && {
+              minHeight: 100, maxHeight: 120, maxWidth: 560, minWidth: 560
+            }),
+          }]}
           placeholder="Descrição do Serviço"
           placeholderTextColor="#ccc"
           value={descricao}
@@ -361,28 +393,29 @@ export default function AbrirOrdemServicoScreen() {
             keyboardType="numeric"
             editable={!cepNaoAplicavel}
           />
+
         </View>
-
-        {carregandoCEP ? (
-          <ActivityIndicator
-            size="small"
-            color="#2e86de"
-            style={{ marginVertical: 10 }}
-          />
-        ) : enderecoCompleto ? (
-          <Text style={styles.enderecoPreview}>
-            Endereço: {enderecoCompleto}, {numero}
-          </Text>
-        ) : null}
-
+        <View style={styles.containerCEP}>
+          {carregandoCEP ? (
+            <ActivityIndicator
+              size="small"
+              color="#2e86de"
+              style={{ marginVertical: 10 }}
+            />
+          ) : enderecoCompleto ? (
+            <Text style={styles.enderecoPreview}>
+              Endereço: {enderecoCompleto}, {numero}
+            </Text>
+          ) : null}
+        </View>
         {loadingImagem ? (
           <ActivityIndicator
             size="large"
             color="#2e86de"
-            style={{ marginVertical: 15 }}
+            style={{ marginVertical: 10 }}
           />
         ) : (
-          <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
+          <TouchableOpacity style={styles.imageButton} onPress={handlePickMultipleImages}>
             <MaterialIcons name="photo-camera" size={22} color="#fff" />
             <Text style={styles.imageButtonText}>Adicionar Foto</Text>
           </TouchableOpacity>
@@ -464,7 +497,7 @@ const styles = StyleSheet.create({
 
   container: {
     backgroundColor: "#fff",
-    padding: 20,
+    padding: 10,
     borderRadius: 20,
     elevation: 5,
     shadowColor: "#000",
@@ -482,14 +515,17 @@ const styles = StyleSheet.create({
         marginBottom: 30,
       }
       : {
-        flex: 1,
-        width: "115%",
-        marginVertical:10
+        minWidth: 360,
+        maxWidth: 360,
+        paddingVertical: 20,
+        marginVertical: 10,
+        flexGrow: 1,
       }),
   },
 
 
   containerCEP: {
+    paddingHorizontal: 20,
     flexDirection: "row",
     justifyContent: "space-around",
     marginVertical: 0,
@@ -537,12 +573,13 @@ const styles = StyleSheet.create({
     }),
   },
   inputCEP: {
-    width: "40%",
+    width: "50%",
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#2e86de",
     borderRadius: 10,
     padding: 12,
+    marginHorizontal: 5,
     marginBottom: 5,
     elevation: 2,
     ...(Platform.OS === "web" && {
@@ -550,6 +587,10 @@ const styles = StyleSheet.create({
     }),
   },
   enderecoPreview: {
+    maxWidth: 330,
+    display: 'flex',
+    alignItems: 'center',
+    textAlign: 'center',
     backgroundColor: "#eef",
     padding: 10,
     borderRadius: 8,
@@ -567,7 +608,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F39C12",
     padding: 12,
     borderRadius: 10,
-    marginVertical: 10,
+    marginTop: 10,
     elevation: 3,
     justifyContent: "center",
     ...(Platform.OS === "web" && {
@@ -581,7 +622,7 @@ const styles = StyleSheet.create({
   },
   imagePreviewContainer: {
     position: "relative",
-    margin: 5,
+    marginRight: 5,
   },
   removeImage: {
     position: "absolute",
@@ -592,8 +633,8 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   imagePreview: {
-    width: Platform.OS === "web" ? 140 : 120,
-    height: Platform.OS === "web" ? 140 : 120,
+    width: Platform.OS === "web" ? 140 : 100,
+    height: Platform.OS === "web" ? 140 : 100,
     resizeMode: "cover",
     borderRadius: 10,
   },
@@ -604,7 +645,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#27ae60",
     padding: 15,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 5,
     justifyContent: "center",
     elevation: 4,
     ...(Platform.OS === "web" && {

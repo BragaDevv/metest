@@ -270,11 +270,12 @@ export default function VisualizarOrdensScreen() {
                       color="#007bff"
                       style={{
                         position: "relative",
+                        top: -30,
                         right: 25,
                         ...(Platform.OS === "web"
                           ? {
-                              left: 50,
-                            }
+                            left: 50,
+                          }
                           : {}),
                       }}
                     />
@@ -352,13 +353,28 @@ export default function VisualizarOrdensScreen() {
           )}
 
           {item.status === "em_execucao" && (
-            <TouchableOpacity
-              style={styles.finalizarButton}
-              onPress={() => finalizarOrdem(item)}
-            >
-              <Text style={styles.buttonText}>Finalizar</Text>
-            </TouchableOpacity>
+            Platform.OS !== "web" ? (
+              <TouchableOpacity
+                style={styles.finalizarButton}
+                onPress={() => finalizarOrdem(item)}
+              >
+                <Text style={styles.buttonText}>Finalizar</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text
+                        style={{
+                          marginTop: 10,
+                          fontStyle: "italic",
+                          color: "#888",
+                          textAlign: "center",
+                        }}
+                      >
+                        ✍️ Assinatura disponível apenas no mobile.
+                      </Text>
+            )
           )}
+
+
 
           {isAdmin && (
             <TouchableOpacity
@@ -500,9 +516,9 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  
+
   conteudo: {
-    flex:1,
+    flex: 1,
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 20,
@@ -513,19 +529,19 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-          width: "70%",
-          maxWidth: "100%",
-          alignSelf: "center",
-          justifyContent: "center", // centraliza verticalmente
-          alignItems: "center", // centraliza horizontalmente
-          paddingTop: 40,
-          paddingBottom: 40,
-          marginVertical: "2%",
-        }
+        width: "70%",
+        maxWidth: "100%",
+        alignSelf: "center",
+        justifyContent: "center", // centraliza verticalmente
+        alignItems: "center", // centraliza horizontalmente
+        paddingTop: 40,
+        paddingBottom: 40,
+        marginVertical: "2%",
+      }
       : {
         flex: 1,
         width: "95%",
-        marginVertical:10
+        marginVertical: 10
       }),
   },
 
@@ -538,8 +554,8 @@ const styles = StyleSheet.create({
     color: "#000",
     ...(Platform.OS === "web"
       ? {
-          fontSize: 48,
-        }
+        fontSize: 48,
+      }
       : {}),
   },
   buscaContainer: {
@@ -558,8 +574,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     ...(Platform.OS === "web"
       ? {
-          width: 600,
-        }
+        width: 600,
+      }
       : {}),
   },
 
@@ -585,8 +601,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-          width: 700,
-        }
+        width: 700,
+      }
       : {}),
   },
 
@@ -677,8 +693,8 @@ const styles = StyleSheet.create({
     gap: 2,
     ...(Platform.OS === "web"
       ? {
-          gap: 30,
-        }
+        gap: 30,
+      }
       : {}),
   },
   filtroBotao: {
@@ -706,4 +722,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
   },
+
 });

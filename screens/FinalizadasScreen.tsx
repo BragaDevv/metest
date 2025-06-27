@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Image,
   Alert,
+  ImageBackground,
+  Platform,
 } from "react-native";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
@@ -96,162 +98,98 @@ export default function OrdensFinalizadasScreen() {
   const getAssinaturaUri = (assinatura: string) => assinatura;
 
   const gerarPDF = async (ordem: Ordem) => {
-    const logoUrl =
-      "https://res.cloudinary.com/dy48gdjlv/image/upload/v1750811880/logo-metest_f9wxzj.png";
-
+    const logoUrl = "https://res.cloudinary.com/dy48gdjlv/image/upload/v1750811880/logo-metest_f9wxzj.png";
     const dataHora = ordem.finalizadoEm?.seconds
       ? new Date(ordem.finalizadoEm.seconds * 1000).toLocaleString("pt-BR")
-      : ordem.criadoEm?.seconds
-      ? new Date(ordem.criadoEm.seconds * 1000).toLocaleString("pt-BR")
-      : "";
+      : new Date().toLocaleString("pt-BR");
 
-    const criadoEm = ordem.criadoEm?.seconds
-      ? new Date(ordem.criadoEm.seconds * 1000).toLocaleString("pt-BR")
-      : "—";
-
-    const inicioExecucao = ordem.inicioExecucao?.seconds
-      ? new Date(ordem.inicioExecucao.seconds * 1000).toLocaleString("pt-BR")
-      : "—";
-
-    const finalizadoEm = ordem.finalizadoEm?.seconds
-      ? new Date(ordem.finalizadoEm.seconds * 1000).toLocaleString("pt-BR")
-      : "—";
-
-    const fotosHtml =
-      ordem.fotosDepois && ordem.fotosDepois.length > 0
-        ? ordem.fotosDepois
-            .map(
-              (foto) => `
-        <div style="display: inline-block; width: 20%; margin: 0.5%;">
-          <img src="${foto.url}" style="width: 100%; border-radius: 4px;" />
-          <p style="font-size: 8px; margin: 2px 0;">
+    const fotosHtml = ordem.fotosDepois?.length
+      ? ordem.fotosDepois
+        .map(
+          (foto) => `
+        <div style="margin: 4px 0; text-align: center;">
+          <img src="${foto.url.replace('/upload/', '/upload/f_jpg/')}" 
+               style="width: 150px; height: 100px; object-fit: cover; border-radius: 4px;" />
+          <p style="font-size: 8px;">
             📍 ${foto.latitude.toFixed(5)}, ${foto.longitude.toFixed(5)}<br/>
             🕒 ${new Date(foto.timestamp).toLocaleString("pt-BR")}
           </p>
         </div>
       `
-            )
-            .join("")
-        : "<p style='font-style: italic;'>Sem fotos disponíveis.</p>";
+        )
+        .join("")
+      : "<p style='font-style: italic;'>Sem fotos disponíveis.</p>";
+
 
     const htmlContent = `
-  <html>
-    <head>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          font-size: 11px;
-          padding: 10px;
-          margin: 0;
-          color: #333;
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 8px;
-        }
-        .logo {
-          width: 160px;
-          margin-bottom: 6px;
-        }
-        .title {
-          font-size: 18px;
-          font-weight: bold;
-          margin-bottom: 4px;
-        }
-        .row {
-          display: flex;
-          gap: 8px;
-          margin-bottom: 10px;
-        }
-        .section {
-          flex: 1;
-          border: 1px solid #ccc;
-          border-radius: 6px;
-          padding: 5px;
-        }
-        .label {
-          font-weight: bold;
-        }
-        .assinatura {
-          width: 48%;
-          display: inline-block;
-          vertical-align: top;
-          text-align: center;
-        }
-        .assinatura img {
-          width: 100%;
-          max-width: 180px;
-          height: 70px;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          object-fit: contain;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <img src="${logoUrl}" class="logo" />
-        <div class="title">Relatório Fotográfico de Serviço</div>
-        <p><em>Gerado em: ${dataHora}</em></p>
-      </div>
-
-      <div class="row">
-        <div class="section">
-          <p><span class="label">Ordem Nº:</span> ${ordem.numeroOrdem}</p>
-          <p><span class="label">Cliente:</span> ${ordem.cliente}</p>
-          <p><span class="label">Empresa:</span> ${ordem.empresa}</p>
-          <span class="label">Executado por:</span> ${
-            ordem.executadoPorNome || ordem.executadoPor || "—"
-          }
+    <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; font-size: 11px; color: #333; padding: 10px; }
+          .logo { width: 150px; margin-bottom: 10px; }
+          .section { margin-bottom: 15px; }
+          .assinatura img { width: 180px; height: 70px; border: 1px solid #ccc; object-fit: contain; }
+        </style>
+      </head>
+      <body>
+        <div style="text-align:center;">
+          <img src="${logoUrl}" class="logo" />
+          <h2>Relatório Fotográfico - METEST</h2>
+          <p><em>Gerado em: ${dataHora}</em></p>
         </div>
 
         <div class="section">
-          <p><span class="label"> Abertura:</span> ${criadoEm}</p>
-          <p><span class="label"> Início Execução:</span> ${inicioExecucao}</p>
-          <p><span class="label"> Finalização:</span> ${finalizadoEm}</p>
+          <strong>Ordem:</strong> ${ordem.numeroOrdem}<br/>
+          <strong>Cliente:</strong> ${ordem.cliente} - ${ordem.empresa}<br/>
+          <strong>Executado por:</strong> ${ordem.executadoPorNome}<br/>
+          <strong>Serviço:</strong> ${ordem.descricaoFinal || ordem.descricao}<br/>
+          <strong>Local:</strong> ${ordem.localizacao}
         </div>
-      </div>
 
-      <div class="section">
-        <p><span class="label">Serviço:</span> ${
-          ordem.descricaoFinal || ordem.descricao
-        }</p>
-        <p><span class="label">Localização:</span> ${ordem.localizacao}</p>
-      </div>
-
-      <div class="section">
-        <p class="label">Fotos do Serviço:</p>
-        ${fotosHtml}
-      </div>
-
-      <div class="section">
-        <p class="label">Assinaturas:</p>
-        <div class="assinatura">
-          <p><span class="label">Cliente:</span> ${ordem.cliente}</p>
-          ${
-            ordem.assinatura_cliente
-              ? `<img src="${ordem.assinatura_cliente}" />`
-              : "<p>Sem assinatura</p>"
-          }
+        <div class="section">
+          <strong>Fotos do Serviço:</strong><br/>
+          ${fotosHtml}
         </div>
-        <div class="assinatura">
-          <p><span class="label">METEST:</span> ${
-            ordem.assinatura_metest_nome || ordem.executadoPor
-          }</p>
-          ${
-            ordem.assinatura_metest
-              ? `<img src="${ordem.assinatura_metest}" />`
-              : "<p>Sem assinatura</p>"
-          }
+
+        <div class="section" style="display: flex; justify-content: space-between;">
+          <div class="assinatura">
+            <strong>Assinatura Cliente</strong><br/>
+            ${ordem.assinatura_cliente
+        ? `<img src="${ordem.assinatura_cliente}" />`
+        : "Sem assinatura"
+      }
+          </div>
+          <div class="assinatura">
+            <strong>Assinatura METEST</strong><br/>
+            ${ordem.assinatura_metest
+        ? `<img src="${ordem.assinatura_metest}" />`
+        : "Sem assinatura"
+      }
+          </div>
         </div>
-      </div>
-    </body>
-  </html>
+      </body>
+    </html>
   `;
 
-    const { uri } = await Print.printToFileAsync({ html: htmlContent });
-    await Sharing.shareAsync(uri);
+    if (Platform.OS === "web") {
+      const { base64 } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: true,
+      });
+
+      const link = document.createElement("a");
+      link.href = `data:application/pdf;base64,${base64}`;
+      link.download = `Relatorio_METEST_${ordem.numeroOrdem}.pdf`;
+      link.click();
+    } else {
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      await Sharing.shareAsync(uri);
+    }
+
+
+
   };
+
 
   const renderItem = ({ item }: { item: Ordem }) => (
     <View style={styles.card}>
@@ -448,20 +386,58 @@ export default function OrdensFinalizadasScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Ordens Concluídas</Text>
-      <FlatList
-        data={ordensFinalizadas}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 30 }}
-      />
-    </View>
+    <ImageBackground
+      source={require("../assets/images/bgAll.jpg")}
+      style={styles.container}
+      resizeMode="stretch"
+    >
+      <View style={styles.conteudo}>
+        <Text style={styles.title}>Ordens Concluídas</Text>
+        <FlatList
+          data={ordensFinalizadas}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 30 }}
+        />
+      </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9", padding: 16 },
+  container: {
+    flex: 1,
+    alignItems: "center",
+    width: "100%",
+    height: "100%",
+  },
+  conteudo: {
+    flex: 1,
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 20,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 5, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    ...(Platform.OS === "web"
+      ? {
+        width: "70%",
+        maxWidth: "100%",
+        alignSelf: "center",
+        justifyContent: "center", // centraliza verticalmente
+        alignItems: "center", // centraliza horizontalmente
+        paddingTop: 40,
+        paddingBottom: 40,
+        marginVertical: "2%",
+      }
+      : {
+        flex: 1,
+        width: "95%",
+        marginVertical: 10
+      }),
+  },
   title: {
     fontSize: 24,
     fontWeight: "bold",
@@ -470,21 +446,44 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   card: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 12,
-    elevation: 2,
+    backgroundColor: "#FDEBD0",
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 16,
+    marginHorizontal: 10,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 5, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    ...(Platform.OS === "web"
+      ? {
+        width: 700,
+      }
+      : {}),
   },
   numeroOrdem: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  titleCard: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 6,
+    color: "#000",
+  },
+  status: {
     fontSize: 14,
     fontWeight: "bold",
-    color: "#555",
-    marginBottom: 4,
+    color: "#007bff",
+    marginBottom: 12,
   },
-  titleCard: { fontSize: 18, fontWeight: "bold", marginBottom: 5 },
-  status: { marginTop: 8, fontWeight: "bold", color: "#555" },
-  label: { fontWeight: "bold", color: "#333" },
+  label: {
+    marginTop: 10,
+    fontWeight: "bold",
+    color: "#333",
+  },
   pdfButton: {
     marginTop: 12,
     backgroundColor: "#6c63ff",

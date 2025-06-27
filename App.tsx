@@ -1,12 +1,12 @@
 // App.tsx
 import React, { useEffect, useRef } from "react";
-import { Platform, Text } from "react-native";
+import { ActivityIndicator, Platform, Text, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as Notifications from "expo-notifications";
 import Toast from "react-native-toast-message";
 
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { RootStackParamList } from "./types/types";
 
 import LoginScreen from "./screens/LoginScreen";
@@ -47,6 +47,74 @@ Notifications.setNotificationHandler({
     shouldSetBadge: true,
   }),
 });
+
+const AppContent = () => {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer
+      linking={linking}
+      fallback={<Text>Carregando...</Text>}
+    >
+      <Stack.Navigator initialRouteName="LoginScreen">
+        <Stack.Screen
+          name="LoginScreen"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="InicialScreen"
+          component={InicialScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="OrdemScreen"
+          component={OrdemScreen}
+          options={{ headerShown: Platform.OS !== "web", title: "" }}
+        />
+        <Stack.Screen
+          name="VisualizarScreen"
+          component={VisualizarScreen}
+          options={{ headerShown: Platform.OS !== "web", title: "" }}
+        />
+        <Stack.Screen
+          name="FinalizarScreen"
+          component={FinalizarScreen}
+          options={{ headerShown: Platform.OS !== "web", title: "" }}
+        />
+        <Stack.Screen
+          name="FinalizadasScreen"
+          component={FinalizadasScreen}
+          options={{ headerShown: Platform.OS !== "web", title: "" }}
+        />
+        <Stack.Screen
+          name="AssinaturaScreen"
+          component={AssinaturaScreen}
+          options={{ headerShown: Platform.OS !== "web", title: "" }}
+        />
+        <Stack.Screen
+          name="CadastroScreen"
+          component={CadastroScreen}
+          options={{ headerShown: Platform.OS !== "web", title: "" }}
+        />
+        <Stack.Screen
+          name="AdminPainelScreen"
+          component={AdminPainelScreen}
+          options={{ headerShown: Platform.OS !== "web", title: "" }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
 
 export default function App() {
   const notificationListener = useRef<Notifications.Subscription | null>(null);
@@ -89,58 +157,7 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <NavigationContainer
-        linking={linking}
-        fallback={<Text>Carregando...</Text>}
-      >
-        <Stack.Navigator initialRouteName="LoginScreen">
-          <Stack.Screen
-            name="LoginScreen"
-            component={LoginScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="InicialScreen"
-            component={InicialScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="OrdemScreen"
-            component={OrdemScreen}
-            options={{ headerShown: Platform.OS !== "web", title: "" }}
-          />
-          <Stack.Screen
-            name="VisualizarScreen"
-            component={VisualizarScreen}
-            options={{ headerShown: Platform.OS !== "web", title: "" }}
-          />
-          <Stack.Screen
-            name="FinalizarScreen"
-            component={FinalizarScreen}
-            options={{ headerShown: Platform.OS !== "web", title: "" }}
-          />
-          <Stack.Screen
-            name="FinalizadasScreen"
-            component={FinalizadasScreen}
-            options={{ headerShown: Platform.OS !== "web", title: "" }}
-          />
-          <Stack.Screen
-            name="AssinaturaScreen"
-            component={AssinaturaScreen}
-            options={{ headerShown: Platform.OS !== "web", title: "" }}
-          />
-          <Stack.Screen
-            name="CadastroScreen"
-            component={CadastroScreen}
-            options={{ headerShown: Platform.OS !== "web", title: "" }}
-          />
-          <Stack.Screen
-            name="AdminPainelScreen"
-            component={AdminPainelScreen}
-            options={{ headerShown: Platform.OS !== "web", title: "" }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <AppContent />
     </AuthProvider>
   );
 }

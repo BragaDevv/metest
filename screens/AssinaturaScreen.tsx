@@ -303,7 +303,7 @@ export default function AguardandoAssinaturaScreen() {
                   style={{
                     position: "relative", left: -50, top: 4, ...(Platform.OS === "web"
                       ? {
-                        left: 30,  top: 0
+                        left: 30, top: 0
                       }
                       : {}),
                   }}
@@ -401,42 +401,57 @@ export default function AguardandoAssinaturaScreen() {
         </View>
       )}
 
-      {item.id === assinaturaCapturadaPara && assinaturaTemp ? (
-        <TouchableOpacity
-          style={[styles.assinarButton, { backgroundColor: "#007bff" }]}
-          onPress={async () => {
-            try {
-              await updateDoc(doc(db, "ordens_servico", item.id), {
-                status: "finalizada",
-                assinatura_metest: assinaturaTemp,
-                assinatura_metest_nome: nome,
-                finalizadoEm: new Date(),
-              });
-              setAssinaturaTemp(null);
-              setAssinaturaCapturadaPara(null);
-              fetchOrdensAguardando();
-              Alert.alert("✅ Ordem finalizada com sucesso!");
-            } catch (error) {
-              console.error("Erro ao finalizar ordem:", error);
-              Alert.alert("Erro ao finalizar ordem");
-            }
-          }}
-        >
-          <Ionicons name="checkmark-circle" size={20} color="#fff" />
-          <Text style={styles.buttonText}>Finalizar</Text>
-        </TouchableOpacity>
+      {Platform.OS !== "web" ? (
+        item.id === assinaturaCapturadaPara && assinaturaTemp ? (
+          <TouchableOpacity
+            style={[styles.assinarButton, { backgroundColor: "#007bff" }]}
+            onPress={async () => {
+              try {
+                await updateDoc(doc(db, "ordens_servico", item.id), {
+                  status: "finalizada",
+                  assinatura_metest: assinaturaTemp,
+                  assinatura_metest_nome: nome,
+                  finalizadoEm: new Date(),
+                });
+                setAssinaturaTemp(null);
+                setAssinaturaCapturadaPara(null);
+                fetchOrdensAguardando();
+                Alert.alert("✅ Ordem finalizada com sucesso!");
+              } catch (error) {
+                console.error("Erro ao finalizar ordem:", error);
+                Alert.alert("Erro ao finalizar ordem");
+              }
+            }}
+          >
+            <Ionicons name="checkmark-circle" size={20} color="#fff" />
+            <Text style={styles.buttonText}>Finalizar</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.assinarButton}
+            onPress={() => {
+              setAssinaturaVisivel(item.id);
+              setAssinaturaCapturadaPara(item.id);
+            }}
+          >
+            <Ionicons name="checkmark-done-outline" size={20} color="#fff" />
+            <Text style={styles.buttonText}>Assinar</Text>
+          </TouchableOpacity>
+        )
       ) : (
-        <TouchableOpacity
-          style={styles.assinarButton}
-          onPress={() => {
-            setAssinaturaVisivel(item.id);
-            setAssinaturaCapturadaPara(item.id);
+        <Text
+          style={{
+            marginTop: 10,
+            fontStyle: "italic",
+            color: "#888",
+            textAlign: "center",
           }}
         >
-          <Ionicons name="checkmark-done-outline" size={20} color="#fff" />
-          <Text style={styles.buttonText}>Assinar</Text>
-        </TouchableOpacity>
+          ✍️ Assinatura disponível apenas no mobile.
+        </Text>
       )}
+
+
     </View>
   );
 
@@ -515,7 +530,7 @@ export default function AguardandoAssinaturaScreen() {
 
                 {localSelecionado && (
                   <>
-                    {localSelecionado.localizacao && (
+                    {Platform.OS !== "web" && localSelecionado.localizacao && (
                       <Text style={styles.modalEndereco}>
                         {localSelecionado.localizacao}
                       </Text>
@@ -541,6 +556,7 @@ export default function AguardandoAssinaturaScreen() {
                     </View>
                   </>
                 )}
+
 
                 <TouchableOpacity
                   style={styles.modalCloseButton}
@@ -583,6 +599,12 @@ export default function AguardandoAssinaturaScreen() {
                       paddingVertical: 4,
                       borderRadius: 0,
                       fontSize: 12,
+                      ...(Platform.OS === "web"
+                        ? {
+                          bottom: 10,
+                          left: 450,
+                        }
+                        : {}),
                     }}
                   >
                     {coordenadasSelecionadas.lat.toFixed(5)},{" "}
@@ -601,6 +623,12 @@ export default function AguardandoAssinaturaScreen() {
                       paddingVertical: 4,
                       borderRadius: 0,
                       fontSize: 12,
+                      ...(Platform.OS === "web"
+                        ? {
+                          bottom: 40,
+                          left: 450,
+                        }
+                        : {}),
                     }}
                   >
                     {new Date(timestampSelecionado).toLocaleString("pt-BR")}
@@ -648,7 +676,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   conteudo: {
-    flex:1,
+    flex: 1,
     backgroundColor: "#fff",
     padding: 20,
     borderRadius: 20,
@@ -834,5 +862,11 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     marginBottom: 20,
+    ...(Platform.OS === "web"
+      ? {
+        top: -30,
+        left: 450,
+      }
+      : {}),
   },
 });
