@@ -1,16 +1,14 @@
 // App.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
+import { Platform, Text } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import Toast from "react-native-toast-message";
 
 import { AuthProvider } from "./context/AuthContext";
-import registerForPushNotifications from "./services/registerForPushNotifications";
-import { saveExpoPushToken } from "./services/pushTokenStorage";
-
 import { RootStackParamList } from "./types/types";
+
 import LoginScreen from "./screens/LoginScreen";
 import InicialScreen from "./screens/InicialScreen";
 import OrdemScreen from "./screens/OrdemScreen";
@@ -22,6 +20,24 @@ import CadastroScreen from "@screens/CadastroScreen";
 import AdminPainelScreen from "@screens/AdminPainelScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// ✅ Configuração de linking para suportar histórico do navegador
+const linking = {
+  prefixes: ["http://localhost:8081", "https://seuapp.com"],
+  config: {
+    screens: {
+      LoginScreen: "login",
+      InicialScreen: "inicial",
+      OrdemScreen: "ordem",
+      VisualizarScreen: "visualizar",
+      FinalizarScreen: "finalizar",
+      FinalizadasScreen: "finalizadas",
+      AssinaturaScreen: "assinatura",
+      CadastroScreen: "cadastro",
+      AdminPainelScreen: "admin",
+    },
+  },
+};
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -71,11 +87,13 @@ export default function App() {
     setupNotifications();
   }, []);
 
-
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <Stack.Navigator>
+      <NavigationContainer
+        linking={linking}
+        fallback={<Text>Carregando...</Text>}
+      >
+        <Stack.Navigator initialRouteName="LoginScreen">
           <Stack.Screen
             name="LoginScreen"
             component={LoginScreen}
@@ -89,65 +107,37 @@ export default function App() {
           <Stack.Screen
             name="OrdemScreen"
             component={OrdemScreen}
-            options={{
-              headerShown: true,
-              headerBackTitle: "Voltar",
-              title: "",
-            }}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
           />
           <Stack.Screen
             name="VisualizarScreen"
             component={VisualizarScreen}
-            options={{
-              headerShown: true,
-              headerBackTitle: "Voltar",
-              title: "",
-            }}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
           />
           <Stack.Screen
             name="FinalizarScreen"
             component={FinalizarScreen}
-            options={{
-              headerShown: true,
-              headerBackTitle: "Voltar",
-              title: "",
-            }}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
           />
           <Stack.Screen
             name="FinalizadasScreen"
             component={FinalizadasScreen}
-            options={{
-              headerShown: true,
-              headerBackTitle: "Voltar",
-              title: "",
-            }}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
           />
           <Stack.Screen
             name="AssinaturaScreen"
             component={AssinaturaScreen}
-            options={{
-              headerShown: true,
-              headerBackTitle: "Voltar",
-              title: "",
-            }}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
           />
           <Stack.Screen
             name="CadastroScreen"
             component={CadastroScreen}
-            options={{
-              headerShown: true,
-              headerBackTitle: "Voltar",
-              title: "",
-            }}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
           />
           <Stack.Screen
             name="AdminPainelScreen"
             component={AdminPainelScreen}
-            options={{
-              headerShown: true,
-              headerBackTitle: "Voltar",
-              title: "",
-            }}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
           />
         </Stack.Navigator>
       </NavigationContainer>

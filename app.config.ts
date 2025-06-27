@@ -28,7 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff",
       },
-      permissions: ["ACCESS_FINE_LOCATION"],
+      permissions: ["ACCESS_FINE_LOCATION", "CAMERA"],
       googleServicesFile: "./google-services.json",
     },
     ios: {

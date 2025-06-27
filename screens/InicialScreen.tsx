@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Platform,
+} from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -76,7 +83,7 @@ export default function TelaInicial() {
           style={styles.botaoCadastro}
           onPress={() => navigation.navigate("CadastroScreen")}
         >
-          <Ionicons name="person-add-outline" size={22} color="#333" />
+          <Ionicons name="person-add-outline" size={28} color="#333" />
         </TouchableOpacity>
       )}
       <Image
@@ -95,7 +102,7 @@ export default function TelaInicial() {
           >
             <Ionicons
               name="add-circle-outline"
-              size={24}
+              size={28}
               color="#fff"
               style={styles.icon}
             />
@@ -109,7 +116,7 @@ export default function TelaInicial() {
         >
           <Ionicons
             name="document-text-outline"
-            size={24}
+            size={28}
             color="#fff"
             style={styles.icon}
           />
@@ -124,7 +131,7 @@ export default function TelaInicial() {
           >
             <Ionicons
               name="pencil"
-              size={24}
+              size={28}
               color="#fff"
               style={styles.icon}
             />
@@ -139,7 +146,7 @@ export default function TelaInicial() {
         >
           <Ionicons
             name="checkmark-done-outline"
-            size={24}
+            size={28}
             color="#3ff"
             style={styles.icon}
           />
@@ -163,38 +170,55 @@ export default function TelaInicial() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: Platform.OS === "web" ? "center" : "center",
     alignItems: "center",
     backgroundColor: "#f2f2f2",
     padding: 20,
+    ...(Platform.OS === "web" && {
+      width: "100%",
+      height: "100%", // força ocupar a altura da janela inteira
+      maxWidth: "100%",
+      alignSelf: "center",
+      minHeight: "100%",
+      paddingTop: 0,
+      backgroundColor: "#fff", // cor exclusiva para Web
+      backgroundImage: "url('/bg.jpg')",
+      backgroundSize: "cover",
+      backgroundRepeat: "no-repeat",
+    }),
   },
   logo: {
-    position:'absolute',
-    top:50,
-    width: 280,
-    height: 200,
-    marginBottom: 20,
+    width: Platform.OS === "web" ? 520 : 280,
+    height: Platform.OS === "web" ? 420 : 200,
+    marginBottom: 10,
+    marginTop: Platform.OS === "web" ? "-20%" : "-20%",
   },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: "bold",
     color: "#333",
     marginBottom: 10,
+    textAlign: "center",
+    ...(Platform.OS === "web" && {
+      position: "relative",
+      bottom: "10%",
+    }),
   },
   info: {
-    fontSize: 16,
-    marginBottom: 5,
+    fontSize: 18,
+    marginBottom: 15,
     color: "#555",
-  },
-  menu: {
-    marginTop: 30,
-    width: "100%",
-    alignItems: "center",
+    textAlign: "center",
+    ...(Platform.OS === "web" && {
+      position: "relative",
+      bottom: "10%",
+    }),
   },
   botaoCadastro: {
     position: "absolute",
-    top: 60,
-    right: 20,
+    top: Platform.OS === "web" ? 30 : 60,
+    left: Platform.OS === "web" ? '85%' : undefined,
+    right: Platform.OS === "web" ? undefined : 20,
     zIndex: 999,
     padding: 8,
     backgroundColor: "#ffffffcc",
@@ -206,6 +230,17 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
 
+  menu: {
+    marginTop: 30,
+    width: "100%",
+    alignItems: "center",
+    ...(Platform.OS === "web" && {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
+      gap: 30,
+    }),
+  },
   menuButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -220,21 +255,34 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+    ...(Platform.OS === "web" && {
+      width: 250,
+      height: 120,
+      justifyContent: "center",
+      flexDirection: "column",
+      gap: 10,
+      marginVertical: 0,
+    }),
   },
+
   menuText: {
     color: "#fff",
     fontSize: 17,
     fontWeight: "bold",
+    textAlign: "center",
   },
+
   icon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   logoutButton: {
-    position:'absolute',
-    bottom:70,
+    position: Platform.OS === "web" ? "absolute" : "absolute",
+    top: Platform.OS === "web" ? 30 : undefined,
+    left: Platform.OS === "web" ? '90%' : undefined, // distância ao lado do "Usuários"
+    bottom: Platform.OS === "web" ? undefined : 70,
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 30,
+    marginTop: Platform.OS === "web" ? 0 : 50,
     backgroundColor: "#e6501e",
     paddingVertical: 12,
     paddingHorizontal: 30,

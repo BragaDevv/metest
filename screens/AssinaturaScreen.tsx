@@ -8,6 +8,7 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
 } from "react-native";
 import {
   collection,
@@ -20,9 +21,9 @@ import { db } from "../firebaseConfig";
 import { Ionicons } from "@expo/vector-icons";
 import { getAuth } from "firebase/auth";
 import SignatureScreen from "react-native-signature-canvas";
-import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { useAuth } from "@context/AuthContext";
+import { WebView } from "react-native-webview";
 
 interface FotoOrdem {
   url: string;
@@ -39,7 +40,7 @@ interface Ordem {
   localizacao: string;
   status: "pendente" | "em_execucao" | "finalizada" | "aguardando_assinatura";
   numeroOrdem?: string;
-  executadoPorNome:string;
+  executadoPorNome: string;
   assinatura_cliente?: string;
   assinatura_metest?: string;
   assinatura_metest_nome: string;
@@ -432,6 +433,21 @@ export default function AguardandoAssinaturaScreen() {
     </View>
   );
 
+  const iframeHtml = `
+  <html>
+    <body style="margin:0;padding:0">
+      <iframe 
+        width="100%" 
+        height="100%" 
+        style="border:0;border-radius:10px"
+        loading="lazy"
+        allowfullscreen
+        src="https://maps.google.com/maps?q=${localSelecionado?.latitude},${localSelecionado?.longitude}&z=17&output=embed"
+      ></iframe>
+    </body>
+  </html>
+`;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Aguardando Assinatura</Text>
@@ -484,33 +500,36 @@ export default function AguardandoAssinaturaScreen() {
               <Text style={styles.modalTitleMaps}>
                 Localização do Executante
               </Text>
+
               {localSelecionado && (
                 <>
-                  {localSelecionado?.localizacao && (
+                  {localSelecionado.localizacao && (
                     <Text style={styles.modalEndereco}>
                       {localSelecionado.localizacao}
                     </Text>
                   )}
-                  <MapView
-                    style={styles.modalMap}
-                    initialRegion={{
-                      latitude: localSelecionado.latitude,
-                      longitude: localSelecionado.longitude,
-                      latitudeDelta: 0.005,
-                      longitudeDelta: 0.005,
-                    }}
-                  >
-                    <Marker
-                      coordinate={{
-                        latitude: localSelecionado.latitude,
-                        longitude: localSelecionado.longitude,
-                      }}
-                      title="Executante"
-                      description={localSelecionado.localizacao}
-                    />
-                  </MapView>
+
+                  <View style={styles.modalMap}>
+                    {Platform.OS === "web" ? (
+                      <iframe
+                        width="100%"
+                        height="300"
+                        style={{ border: 0, borderRadius: 10 }}
+                        loading="lazy"
+                        allowFullScreen
+                        src={`https://maps.google.com/maps?q=${localSelecionado.latitude},${localSelecionado.longitude}&z=17&output=embed`}
+                      />
+                    ) : (
+                      <WebView
+                        originWhitelist={["*"]}
+                        source={{ html: iframeHtml }}
+                        style={{ height: 300, borderRadius: 10 }}
+                      />
+                    )}
+                  </View>
                 </>
               )}
+
               <TouchableOpacity
                 style={styles.modalCloseButton}
                 onPress={() => setModalVisible(false)}

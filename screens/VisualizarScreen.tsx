@@ -8,6 +8,9 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
+  TextInput,
+  ImageBackground,
 } from "react-native";
 import {
   collection,
@@ -26,6 +29,7 @@ import { getAuth } from "firebase/auth";
 import { useAuth } from "../context/AuthContext"; // ajuste o caminho conforme seu projeto
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
+import { Linking } from "react-native";
 
 interface Ordem {
   id: string;
@@ -64,6 +68,7 @@ export default function VisualizarOrdensScreen() {
   const [modalFotoVisivel, setModalFotoVisivel] = useState(false);
 
   const [nome, setNome] = useState<string | null>(null);
+  const [termoBusca, setTermoBusca] = useState("");
 
   const fetchOrdens = async () => {
     try {
@@ -105,6 +110,35 @@ export default function VisualizarOrdensScreen() {
     carregarNome();
   }, [user]);
 
+  const abrirNoMapaComEscolha = (endereco: string) => {
+    Alert.alert("Abrir no mapa", "Escolha o app de navegação:", [
+      {
+        text: "Google Maps",
+        onPress: () => {
+          const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+            endereco
+          )}`;
+          Linking.openURL(url).catch(() =>
+            Alert.alert("Erro", "Não foi possível abrir o Google Maps.")
+          );
+        },
+      },
+      {
+        text: "Waze",
+        onPress: () => {
+          const url = `https://waze.com/ul?q=${encodeURIComponent(endereco)}`;
+          Linking.openURL(url).catch(() =>
+            Alert.alert("Erro", "Não foi possível abrir o Waze.")
+          );
+        },
+      },
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+    ]);
+  };
+
   const excluirOrdem = async (id: string) => {
     Alert.alert("Confirmar", "Tem certeza que deseja excluir esta ordem?", [
       { text: "Cancelar", style: "cancel" },
@@ -141,7 +175,7 @@ export default function VisualizarOrdensScreen() {
         status: "em_execucao",
         inicioExecucao: serverTimestamp(),
         executadoPor: userEmail,
-        executadoPorNome: nome, 
+        executadoPorNome: nome,
         localInicio: {
           latitude,
           longitude,
@@ -168,6 +202,16 @@ export default function VisualizarOrdensScreen() {
     filtroStatus === "todas"
       ? ordens
       : ordens.filter((ordem) => ordem.status === filtroStatus);
+
+  const ordensFiltradasEBuscadas = ordensFiltradas.filter((ordem) => {
+    const termo = termoBusca.toLowerCase();
+    return (
+      ordem.cliente?.toLowerCase().includes(termo) ||
+      ordem.empresa?.toLowerCase().includes(termo) ||
+      ordem.descricao?.toLowerCase().includes(termo) ||
+      ordem.numeroOrdem?.toLowerCase().includes(termo)
+    );
+  });
 
   const contar = (status: Ordem["status"]) =>
     ordens.filter((o) => o.status === status).length;
@@ -204,8 +248,40 @@ export default function VisualizarOrdensScreen() {
           <Text style={styles.label}>Descrição:</Text>
           <Text style={styles.valor}>{item.descricao}</Text>
 
-          <Text style={styles.label}>Localização:</Text>
-          <Text style={styles.valor}>{item.localizacao}</Text>
+          {console.log(
+            "📍 Localização da ordem",
+            item.numeroOrdem,
+            "=>",
+            `"${item.localizacao}"`
+          )}
+          {item.localizacao &&
+            item.localizacao.trim() !== "" &&
+            !item.localizacao.toLowerCase().includes("não aplicável") && (
+              <>
+                <Text style={styles.label}>Localização:</Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={styles.valor}>{item.localizacao}</Text>
+                  <TouchableOpacity
+                    onPress={() => abrirNoMapaComEscolha(item.localizacao)}
+                  >
+                    <Ionicons
+                      name="navigate"
+                      size={24}
+                      color="#007bff"
+                      style={{
+                        position: "relative",
+                        right: 25,
+                        ...(Platform.OS === "web"
+                          ? {
+                              left: 50,
+                            }
+                          : {}),
+                      }}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
 
           {item.observacoes && (
             <>
@@ -244,7 +320,7 @@ export default function VisualizarOrdensScreen() {
           {Array.isArray(item.fotosAntes) && item.fotosAntes.length > 0 && (
             <>
               <Text style={styles.label}>
-                Fotos relacionadas a Ordem #{item.numeroOrdem}{" "}
+                Fotos relacionadas a Ordem #{item.numeroOrdem}
               </Text>
               <View style={styles.imagensContainer}>
                 {item.fotosAntes.map((url, idx) => (
@@ -298,124 +374,217 @@ export default function VisualizarOrdensScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Ordens de Serviço</Text>
-      <View style={styles.filtros}>
-        <TouchableOpacity
-          style={[
-            styles.filtroBotao,
-            filtroStatus === "todas" && styles.filtroAtivo,
-          ]}
-          onPress={() => setFiltroStatus("todas")}
-        >
-          <Text style={styles.filtroTexto}>Todas ({ordens.length})</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filtroBotao,
-            filtroStatus === "pendente" && styles.filtroAtivo,
-          ]}
-          onPress={() => setFiltroStatus("pendente")}
-        >
-          <Text style={styles.filtroTexto}>
-            Pendentes ({contar("pendente")})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.filtroBotao,
-            filtroStatus === "em_execucao" && styles.filtroAtivo,
-          ]}
-          onPress={() => setFiltroStatus("em_execucao")}
-        >
-          <Text style={styles.filtroTexto}>
-            Em Execução ({contar("em_execucao")})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {ordensFiltradas.length === 0 ? (
-        <View style={styles.semOrdensContainer}>
-          <Text style={styles.semOrdensTexto}>
-            📭 Nenhuma ordem no momento.
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={ordensFiltradas}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 30 }}
-        />
-      )}
-
-      {modalFotoVisivel && fotoSelecionada && (
-        <Modal visible={modalFotoVisivel} transparent animationType="fade">
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "rgba(0,0,0,0.9)",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
+    <ImageBackground
+      source={require("../assets/images/bgAll.jpg")}
+      style={styles.container}
+      resizeMode="stretch"
+    >
+      <View style={styles.conteudo}>
+        <Text style={styles.title}>Ordens de Serviço</Text>
+        <View style={styles.filtros}>
+          <TouchableOpacity
+            style={[
+              styles.filtroBotao,
+              filtroStatus === "todas" && styles.filtroAtivo,
+            ]}
+            onPress={() => setFiltroStatus("todas")}
           >
-            <TouchableOpacity
-              style={{
-                position: "absolute",
-                top: 90,
-                right: 30,
-                backgroundColor: "#e74c3c",
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 8,
-              }}
-              onPress={() => {
-                setModalFotoVisivel(false);
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "bold" }}>Fechar</Text>
-            </TouchableOpacity>
+            <Text style={styles.filtroTexto}>Todas ({ordens.length})</Text>
+          </TouchableOpacity>
 
-            <Image
-              source={{ uri: fotoSelecionada }}
-              style={{ width: "90%", height: "70%", borderRadius: 10 }}
-              resizeMode="contain"
+          <TouchableOpacity
+            style={[
+              styles.filtroBotao,
+              filtroStatus === "pendente" && styles.filtroAtivo,
+            ]}
+            onPress={() => setFiltroStatus("pendente")}
+          >
+            <Text style={styles.filtroTexto}>
+              Pendentes ({contar("pendente")})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.filtroBotao,
+              filtroStatus === "em_execucao" && styles.filtroAtivo,
+            ]}
+            onPress={() => setFiltroStatus("em_execucao")}
+          >
+            <Text style={styles.filtroTexto}>
+              Em Execução ({contar("em_execucao")})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.buscaContainer}>
+          <Text style={styles.label}>Buscar:</Text>
+          <View style={styles.campoBuscaWrapper}>
+            <Ionicons
+              name="search"
+              size={20}
+              color="#666"
+              style={{ marginRight: 6 }}
+            />
+            <TextInput
+              style={styles.inputBusca}
+              placeholder="Cliente, ID, empresa ou descrição..."
+              placeholderTextColor="#aaa"
+              value={termoBusca}
+              onChangeText={setTermoBusca}
             />
           </View>
-        </Modal>
-      )}
-    </View>
+        </View>
+
+        {ordensFiltradas.length === 0 ? (
+          <View style={styles.semOrdensContainer}>
+            <Text style={styles.semOrdensTexto}>
+              📭 Nenhuma ordem no momento.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={ordensFiltradasEBuscadas}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={{ paddingBottom: 30 }}
+          />
+        )}
+
+        {modalFotoVisivel && fotoSelecionada && (
+          <Modal visible={modalFotoVisivel} transparent animationType="fade">
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: "rgba(0,0,0,0.9)",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <TouchableOpacity
+                style={{
+                  position: "absolute",
+                  top: 90,
+                  right: 30,
+                  backgroundColor: "#e74c3c",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                }}
+                onPress={() => {
+                  setModalFotoVisivel(false);
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Fechar
+                </Text>
+              </TouchableOpacity>
+
+              <Image
+                source={{ uri: fotoSelecionada }}
+                style={{ width: "90%", height: "70%", borderRadius: 10 }}
+                resizeMode="contain"
+              />
+            </View>
+          </Modal>
+        )}
+      </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f9f9f9",
-    padding: 16,
+    alignItems: "center",
+    width: "100%",
+    height: "100%",
+  },
+  conteudo: {
+    flex: 1,
+    backgroundColor: "#fff",
+    padding: 40,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 5, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    ...(Platform.OS === "web"
+      ? {
+          width: "70%",
+          maxWidth: "100%",
+          alignSelf: "center",
+          justifyContent: "center", // centraliza verticalmente
+          alignItems: "center", // centraliza horizontalmente
+          paddingTop: 40,
+          paddingBottom: 40,
+          borderRadius: 16,
+          marginVertical: "2%",
+        }
+      : {}),
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
-    color: "#333",
+    color: "#000",
+    ...(Platform.OS === "web"
+      ? {
+          fontSize: 48,
+        }
+      : {}),
   },
-  card: {
+  buscaContainer: {
+    marginBottom: 16,
+  },
+
+  campoBuscaWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#fff",
-    padding: 18,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    marginTop: 6,
+    ...(Platform.OS === "web"
+      ? {
+          width: 600,
+        }
+      : {}),
+  },
+
+  inputBusca: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+    outlineWidth: 0, // ✅ remove contorno ao focar no Web
+    borderWidth: 0,
+    backgroundColor: "transparent",
+  },
+
+  card: {
+    backgroundColor: "#FDEBD0",
+    padding: 10,
     borderRadius: 12,
     marginBottom: 16,
+    marginHorizontal: 10,
     elevation: 3,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 5, height: 5 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+    ...(Platform.OS === "web"
+      ? {
+          width: 700,
+        }
+      : {}),
   },
+
   cardExecucao: {
-    backgroundColor: "#e6f9ec",
+    backgroundColor: "#A9DFBF",
   },
   cardHeader: {
     flexDirection: "row",
@@ -424,14 +593,15 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   numeroOrdem: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#555",
+    color: "#000",
   },
   titleCard: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 6,
+    color: "#000",
   },
   status: {
     fontSize: 14,
@@ -498,15 +668,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     flexWrap: "wrap",
     gap: 2,
+    ...(Platform.OS === "web"
+      ? {
+          gap: 30,
+        }
+      : {}),
   },
   filtroBotao: {
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 5,
     backgroundColor: "#ccc",
     borderRadius: 8,
   },
   filtroAtivo: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#F39C12",
   },
   filtroTexto: {
     color: "#fff",

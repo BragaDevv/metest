@@ -26,23 +26,45 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [erro, setErro] = useState("");
 
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      setErro("Preencha o e-mail e a senha.");
+      return;
+    }
+
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       console.log("✅ Login realizado:", userCredential.user.uid);
 
       const token = await registerForPushNotifications();
       if (token) {
-        await saveExpoPushToken(token); // Agora salvo com o user.uid disponível
+        await saveExpoPushToken(token);
       }
 
-      navigation.replace("InicialScreen"); // ou sua tela principal
-
+      setErro(""); // limpa erro
+      navigation.replace("InicialScreen");
     } catch (error: any) {
       console.error("Erro ao logar:", error);
-      Alert.alert("Erro ao logar", error.message);
+      let mensagem = "Erro ao tentar fazer login.";
+
+      if (error.code === "auth/user-not-found") {
+        mensagem = "Usuário não encontrado.";
+      } else if (error.code === "auth/wrong-password") {
+        mensagem = "Senha incorreta.";
+      } else if (error.code === "auth/invalid-email") {
+        mensagem = "E-mail inválido.";
+      } else if (error.code === "auth/too-many-requests") {
+        mensagem = "Muitas tentativas. Tente novamente mais tarde.";
+      }
+
+      setErro(mensagem);
     }
   };
 
@@ -51,7 +73,10 @@ export default function LoginScreen() {
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
         <Image
           source={require("../assets/images/logo-metest.png")}
           style={styles.logo}
@@ -72,6 +97,8 @@ export default function LoginScreen() {
           secureTextEntry
           value={password}
           onChangeText={setPassword}
+          returnKeyType="done"
+          onSubmitEditing={handleLogin}
         />
         {erro ? <Text style={styles.erro}>{erro}</Text> : null}
         <TouchableOpacity
@@ -79,7 +106,9 @@ export default function LoginScreen() {
           onPress={handleLogin}
           disabled={loading}
         >
-          <Text style={styles.buttonText}>{loading ? "Entrando..." : "Entrar"}</Text>
+          <Text style={styles.buttonText}>
+            {loading ? "Entrando..." : "Entrar"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -91,33 +120,46 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    paddingVertical: 40,
+    paddingHorizontal: 20,
     backgroundColor: "#fff",
+    ...(Platform.OS === "web" && {
+      maxWidth: 400,
+      width: "100%",
+      alignSelf: "center",
+      marginTop: 60,
+      marginBottom: 60,
+    }),
   },
   logo: {
-    width: 200,
-    height: 120,
+    width: Platform.OS === "web" ? 250 : 200,
+    height: Platform.OS === "web" ? 150 : 120,
     marginBottom: 20,
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
     marginBottom: 30,
+    textAlign: "center",
   },
   input: {
     width: "100%",
+    maxWidth: 400,
     borderWidth: 1,
     borderColor: "#ccc",
     padding: 10,
     borderRadius: 5,
     marginBottom: 15,
+    fontSize: 16,
   },
   button: {
     width: "100%",
+    maxWidth: 400,
     backgroundColor: "#e6501e",
     padding: 12,
     borderRadius: 5,
     alignItems: "center",
+    marginTop: 10,
   },
   buttonText: {
     color: "#fff",
@@ -127,5 +169,6 @@ const styles = StyleSheet.create({
   erro: {
     color: "red",
     marginBottom: 10,
+    textAlign: "center",
   },
 });

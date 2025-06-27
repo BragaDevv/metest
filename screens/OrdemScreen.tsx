@@ -10,6 +10,8 @@ import {
   Image,
   FlatList,
   ActivityIndicator,
+  Platform,
+  ImageBackground,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import {
@@ -39,12 +41,15 @@ export default function AbrirOrdemServicoScreen() {
   const [fotosAntes, setFotos] = useState<string[]>([]);
   const [loadingImagem, setLoadingImagem] = useState(false);
   const [carregandoCEP, setCarregandoCEP] = useState(false);
+  const [cepNaoAplicavel, setCepNaoAplicavel] = useState(false);
+  const [loadingOrdem, setLoadingOrdem] = useState(false);
 
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const gerarNumeroOrdem = async (): Promise<string> => {
-    const controleRef = doc(db, "controle_ordens", "contador");
+    const anoAtual = new Date().getFullYear(); // ex: 2025
+    const controleRef = doc(db, "controle_ordens", `contador_${anoAtual}`);
     const snap = await getDoc(controleRef);
 
     let novoNumero = 1;
@@ -57,72 +62,123 @@ export default function AbrirOrdemServicoScreen() {
       await setDoc(controleRef, { ultimoNumero: 1 });
     }
 
-    return String(novoNumero).padStart(4, "0");
+    const numeroFormatado = String(novoNumero).padStart(4, "0"); // ex: 0001
+    return `${anoAtual}-${numeroFormatado}`; // ex: 2025-0001
+  };
+
+  const formatarCEP = (valor: string) => {
+    const cepNumeros = valor.replace(/\D/g, ""); // remove tudo que não for número
+    if (cepNumeros.length <= 5) return cepNumeros;
+    return `${cepNumeros.slice(0, 5)}-${cepNumeros.slice(5, 8)}`;
+  };
+
+  const requestCameraPermission = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permissão negada", "Você precisa permitir o uso da câmera.");
+      return false;
+    }
+    return true;
   };
 
   const handlePickImage = async () => {
-    Alert.alert(
-      "Selecionar Imagem",
-      "Escolha a origem da imagem:",
-      [
-        {
-          text: "Câmera",
-          onPress: async () => {
-            try {
-              setLoadingImagem(true);
-              const cameraResult = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 0.5,
-              });
+    if (Platform.OS === "web") {
+      try {
+        setLoadingImagem(true);
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.5,
+        });
 
-              if (!cameraResult.canceled && cameraResult.assets.length > 0) {
-                setFotos((prev) => [...prev, cameraResult.assets[0].uri]);
-              }
-            } catch (error) {
-              Alert.alert("Erro ao abrir a câmera");
-            } finally {
-              setLoadingImagem(false);
-            }
-          },
-        },
-        {
-          text: "Galeria",
-          onPress: async () => {
-            try {
-              setLoadingImagem(true);
-              const galleryResult = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 0.5,
-              });
+        if (!result.canceled && result.assets.length > 0) {
+          setFotos((prev) => [...prev, result.assets[0].uri]);
+        }
+      } catch (error) {
+        console.error("Erro ao selecionar imagem na web:", error);
+        alert("Erro ao selecionar imagem.");
+      } finally {
+        setLoadingImagem(false);
+      }
+    } else {
+      Alert.alert(
+        "Selecionar Imagem",
+        "Escolha a origem da imagem:",
+        [
+          {
+            text: "Câmera",
+            onPress: async () => {
+              const temPermissao = await requestCameraPermission();
+              if (!temPermissao) return;
 
-              if (!galleryResult.canceled && galleryResult.assets.length > 0) {
-                setFotos((prev) => [...prev, galleryResult.assets[0].uri]);
+              try {
+                setLoadingImagem(true);
+                const cameraResult = await ImagePicker.launchCameraAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  quality: 0.5,
+                });
+
+                if (!cameraResult.canceled && cameraResult.assets.length > 0) {
+                  setFotos((prev) => [...prev, cameraResult.assets[0].uri]);
+                }
+              } catch (error) {
+                console.error("Erro ao abrir a câmera:", error);
+                Alert.alert("Erro ao abrir a câmera");
+              } finally {
+                setLoadingImagem(false);
               }
-            } catch (error) {
-              Alert.alert("Erro ao acessar a galeria");
-            } finally {
-              setLoadingImagem(false);
-            }
+            },
           },
-        },
-        {
-          text: "Cancelar",
-          style: "cancel",
-        },
-      ],
-      { cancelable: true }
-    );
+          {
+            text: "Galeria",
+            onPress: async () => {
+              try {
+                setLoadingImagem(true);
+                const galleryResult = await ImagePicker.launchImageLibraryAsync(
+                  {
+                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                    quality: 0.5,
+                  }
+                );
+
+                if (
+                  !galleryResult.canceled &&
+                  galleryResult.assets.length > 0
+                ) {
+                  setFotos((prev) => [...prev, galleryResult.assets[0].uri]);
+                }
+              } catch (error) {
+                Alert.alert("Erro ao acessar a galeria");
+              } finally {
+                setLoadingImagem(false);
+              }
+            },
+          },
+          {
+            text: "Cancelar",
+            style: "cancel",
+          },
+        ],
+        { cancelable: true }
+      );
+    }
   };
 
-  const handleRemoveImage = (uri: string) => {
-    setFotos((prev) => prev.filter((foto) => foto !== uri));
+  const handleRemoveImage = (indexToRemove: number) => {
+    setFotos((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
   const handleSubmit = async () => {
-    if (!cliente || !empresa || !descricao || !localizacao || !numero) {
-      Alert.alert("Preencha todos os campos");
+    if (!cliente || !empresa || !descricao) {
+      Alert.alert("Preencha todos os campos obrigatórios");
       return;
     }
+
+    if (!cepNaoAplicavel && (!localizacao || !numero)) {
+      Alert.alert("Preencha o CEP e Número ou marque como 'Não aplicável'");
+      return;
+    }
+
+    setLoadingOrdem(true);
 
     try {
       const numeroOrdem = await gerarNumeroOrdem();
@@ -132,7 +188,9 @@ export default function AbrirOrdemServicoScreen() {
         cliente,
         empresa,
         descricao,
-        localizacao: `${localizacao}, Nº ${numero}`,
+        localizacao: cepNaoAplicavel
+          ? "Endereço não aplicável"
+          : `${localizacao}, Nº ${numero}`,
         fotosAntes,
         status: "pendente",
         criadoEm: serverTimestamp(),
@@ -164,20 +222,21 @@ export default function AbrirOrdemServicoScreen() {
     } catch (error) {
       console.error("Erro ao criar ordem:", error);
       Alert.alert("Erro ao salvar a ordem");
+    } finally {
+      setLoadingOrdem(false);
     }
   };
 
   return (
+    
     <ScrollView contentContainerStyle={styles.container}>
-      <Image
-        source={require("../assets/images/icon.png")}
-        style={styles.bgLogo}
-      />
       <Text style={styles.title}>Nova Ordem de Serviço</Text>
-      <Text style={styles.label}>Nome do Cliente / Responsável:</Text>
+
+      <Text style={styles.label}>Nome do Cliente:</Text>
       <TextInput
         style={styles.input}
         placeholder="Nome do Cliente"
+        placeholderTextColor="#ccc"
         value={cliente}
         onChangeText={setCliente}
       />
@@ -185,32 +244,64 @@ export default function AbrirOrdemServicoScreen() {
       <TextInput
         style={styles.input}
         placeholder="Empresa"
+        placeholderTextColor="#ccc"
         value={empresa}
         onChangeText={setEmpresa}
       />
+
       <Text style={styles.label}>Descrição do Serviço:</Text>
       <TextInput
         style={[styles.input, { height: 100 }]}
         placeholder="Descrição do Serviço"
+        placeholderTextColor="#ccc"
         value={descricao}
         onChangeText={setDescricao}
         multiline
       />
 
+      <View style={styles.checkboxContainer}>
+        <TouchableOpacity
+          style={styles.checkbox}
+          onPress={() => {
+            const novoEstado = !cepNaoAplicavel;
+            setCepNaoAplicavel(novoEstado);
+            if (novoEstado) {
+              setCep("");
+              setEnderecoCompleto("");
+              setNumero("");
+              setLocalizacao("");
+            }
+          }}
+        >
+          {cepNaoAplicavel ? (
+            <Ionicons name="checkbox" size={24} color="#2e86de" />
+          ) : (
+            <Ionicons name="square-outline" size={24} color="#ccc" />
+          )}
+          <Text style={styles.checkboxLabel}>Endereço"Não aplicável"</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.containerCEP}>
-        <Text style={styles.label}>CEP:</Text>
         <TextInput
-          style={styles.inputCEP}
+          style={[
+            styles.inputCEP,
+            cepNaoAplicavel && { backgroundColor: "#ddd" },
+          ]}
           placeholder="CEP"
+          placeholderTextColor="#ccc"
           value={cep}
           onChangeText={async (value) => {
-            setCep(value);
+            const cepFormatado = formatarCEP(value);
+            setCep(cepFormatado);
 
-            if (value.length === 8) {
+            const apenasNumeros = cepFormatado.replace(/\D/g, "");
+
+            if (apenasNumeros.length === 8) {
               setCarregandoCEP(true);
               try {
                 const responseViaCEP = await fetch(
-                  `https://viacep.com.br/ws/${value}/json/`
+                  `https://viacep.com.br/ws/${apenasNumeros}/json/`
                 );
                 if (!responseViaCEP.ok) throw new Error("ViaCEP fora do ar");
 
@@ -224,7 +315,7 @@ export default function AbrirOrdemServicoScreen() {
               } catch (errorViaCEP) {
                 try {
                   const responseBrasilAPI = await fetch(
-                    `https://brasilapi.com.br/api/cep/v1/${value}`
+                    `https://brasilapi.com.br/api/cep/v1/${apenasNumeros}`
                   );
                   if (!responseBrasilAPI.ok)
                     throw new Error("Erro na BrasilAPI");
@@ -248,17 +339,24 @@ export default function AbrirOrdemServicoScreen() {
             }
           }}
           keyboardType="numeric"
+          maxLength={9}
+          editable={!cepNaoAplicavel}
         />
 
-        <Text style={styles.label}>Número:</Text>
         <TextInput
-          style={styles.inputCEP}
+          style={[
+            styles.inputCEP,
+            cepNaoAplicavel && { backgroundColor: "#ddd" },
+          ]}
           placeholder="Número"
+          placeholderTextColor="#ccc"
           value={numero}
           onChangeText={setNumero}
           keyboardType="numeric"
+          editable={!cepNaoAplicavel}
         />
       </View>
+
       {carregandoCEP ? (
         <ActivityIndicator
           size="small"
@@ -284,32 +382,66 @@ export default function AbrirOrdemServicoScreen() {
         </TouchableOpacity>
       )}
 
-      <FlatList
-        data={fotosAntes}
-        horizontal
-        keyExtractor={(item) => item}
-        renderItem={({ item }) => (
-          <View style={styles.imagePreviewContainer}>
-            <Image source={{ uri: item }} style={styles.imagePreview} />
-            <TouchableOpacity
-              style={styles.removeImage}
-              onPress={() => handleRemoveImage(item)}
-            >
-              <Ionicons name="close-circle" size={22} color="#e74c3c" />
-            </TouchableOpacity>
-          </View>
-        )}
-      />
-
-      <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-        <Ionicons
-          name="save-outline"
-          size={22}
-          color="#fff"
-          style={{ marginRight: 8 }}
+      {Platform.OS === "web" ? (
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: 12,
+            paddingHorizontal: 10,
+            marginBottom: 30,
+          }}
+        >
+          {fotosAntes.map((item, index) => (
+            <View key={index} style={styles.imagePreviewContainer}>
+              <Image source={{ uri: item }} style={styles.imagePreview} />
+              <TouchableOpacity
+                style={styles.removeImage}
+                onPress={() => handleRemoveImage(index)}
+              >
+                <Ionicons name="close-circle" size={22} color="#e74c3c" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <FlatList
+          data={fotosAntes}
+          horizontal
+          keyExtractor={(_, index) => index.toString()}
+          contentContainerStyle={{ paddingVertical: 10 }}
+          renderItem={({ item, index }) => (
+            <View style={styles.imagePreviewContainer}>
+              <Image source={{ uri: item }} style={styles.imagePreview} />
+              <TouchableOpacity
+                style={styles.removeImage}
+                onPress={() => handleRemoveImage(index)}
+              >
+                <Ionicons name="close-circle" size={22} color="#e74c3c" />
+              </TouchableOpacity>
+            </View>
+          )}
         />
-        <Text style={styles.buttonText}>Salvar Ordem</Text>
-      </TouchableOpacity>
+      )}
+
+      {loadingOrdem ? (
+        <ActivityIndicator
+          size="large"
+          color="#27ae60"
+          style={{ marginVertical: 20 }}
+        />
+      ) : (
+        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+          <Ionicons
+            name="save-outline"
+            size={22}
+            color="#fff"
+            style={{ marginRight: 8 }}
+          />
+          <Text style={styles.buttonText}>Salvar Ordem</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -317,15 +449,28 @@ export default function AbrirOrdemServicoScreen() {
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#fff",
     flexGrow: 1,
     position: "relative",
+    ...(Platform.OS === "web"
+      ? {
+          width: "70%",
+          maxWidth: "100%",
+          alignSelf: "center",
+          justifyContent: "center", // centraliza verticalmente
+          alignItems: "center", // centraliza horizontalmente
+          paddingTop: 40,
+          paddingBottom: 40,
+          borderRadius: 16,
+          marginVertical: "2%",
+        }
+      : {}),
   },
+
   containerCEP: {
-    display: "flex",
     flexDirection: "row",
     justifyContent: "space-around",
-    marginVertical: 10,
+    marginVertical: 0,
   },
   bgLogo: {
     position: "absolute",
@@ -339,7 +484,22 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
+    color: "#000",
+    ...(Platform.OS === "web" && {
+      fontSize: 48,
+      marginTop: 20,
+    }),
+  },
+  label: {
+    fontWeight: "bold",
     color: "#333",
+    marginVertical: 2,
+    marginLeft: 5,
+    ...(Platform.OS === "web"
+      ? {
+          fontSize: 16,
+        }
+      : {}),
   },
   input: {
     backgroundColor: "#fff",
@@ -349,9 +509,13 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 5,
     elevation: 2,
+    ...(Platform.OS === "web" && {
+      fontSize: 16,
+      width: "40%",
+    }),
   },
   inputCEP: {
-    width: "30%",
+    width: "40%",
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#2e86de",
@@ -359,26 +523,34 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 5,
     elevation: 2,
+    ...(Platform.OS === "web" && {
+      width: "40%",
+    }),
   },
   enderecoPreview: {
     backgroundColor: "#eef",
     padding: 10,
     borderRadius: 8,
-    marginBottom: 10,
     borderWidth: 1,
     borderColor: "#ccd",
     fontSize: 14,
     color: "#333",
+    ...(Platform.OS === "web" && {
+      marginVertical: "5%",
+    }),
   },
   imageButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#2e86de",
+    backgroundColor: "#F39C12",
     padding: 12,
     borderRadius: 10,
     marginVertical: 10,
     elevation: 3,
     justifyContent: "center",
+    ...(Platform.OS === "web" && {
+      marginVertical: 50,
+    }),
   },
   imageButtonText: {
     color: "#fff",
@@ -387,40 +559,55 @@ const styles = StyleSheet.create({
   },
   imagePreviewContainer: {
     position: "relative",
-    marginRight: 10,
-  },
-  imagePreview: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
+    margin: 5,
   },
   removeImage: {
     position: "absolute",
-    top: -3,
-    right: -3,
+    top: 4,
+    right: 4,
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 2,
   },
+  imagePreview: {
+    width: Platform.OS === "web" ? 140 : 120,
+    height: Platform.OS === "web" ? 140 : 120,
+    resizeMode: "cover",
+    borderRadius: 10,
+  },
+
   button: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#27ae60",
     padding: 15,
     borderRadius: 12,
-    marginVertical: 10,
+    marginBottom: 20,
     justifyContent: "center",
     elevation: 4,
+    ...(Platform.OS === "web" && {
+      width: 300,
+      alignSelf: "center",
+    }),
   },
   buttonText: {
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
   },
-  label: {
-    fontWeight: "bold",
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  checkbox: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 17,
+  },
+  checkboxLabel: {
+    marginLeft: 10,
+    fontSize: 14,
     color: "#333",
-    marginVertical: 6,
-    marginLeft: 5,
   },
 });
