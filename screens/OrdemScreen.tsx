@@ -228,244 +228,266 @@ export default function AbrirOrdemServicoScreen() {
   };
 
   return (
-    
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Nova Ordem de Serviço</Text>
+    <ImageBackground
+      source={require("../assets/images/bgAll.jpg")}
+      style={styles.bg}
+      resizeMode="stretch"
+    >
 
-      <Text style={styles.label}>Nome do Cliente:</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Nome do Cliente"
-        placeholderTextColor="#ccc"
-        value={cliente}
-        onChangeText={setCliente}
-      />
-      <Text style={styles.label}>Empresa:</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Empresa"
-        placeholderTextColor="#ccc"
-        value={empresa}
-        onChangeText={setEmpresa}
-      />
+      <ScrollView contentContainerStyle={styles.container}
+      >
+        <Text style={styles.title}>Nova Ordem de Serviço</Text>
 
-      <Text style={styles.label}>Descrição do Serviço:</Text>
-      <TextInput
-        style={[styles.input, { height: 100 }]}
-        placeholder="Descrição do Serviço"
-        placeholderTextColor="#ccc"
-        value={descricao}
-        onChangeText={setDescricao}
-        multiline
-      />
-
-      <View style={styles.checkboxContainer}>
-        <TouchableOpacity
-          style={styles.checkbox}
-          onPress={() => {
-            const novoEstado = !cepNaoAplicavel;
-            setCepNaoAplicavel(novoEstado);
-            if (novoEstado) {
-              setCep("");
-              setEnderecoCompleto("");
-              setNumero("");
-              setLocalizacao("");
-            }
-          }}
-        >
-          {cepNaoAplicavel ? (
-            <Ionicons name="checkbox" size={24} color="#2e86de" />
-          ) : (
-            <Ionicons name="square-outline" size={24} color="#ccc" />
-          )}
-          <Text style={styles.checkboxLabel}>Endereço"Não aplicável"</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.containerCEP}>
+        <Text style={styles.label}>Nome do Cliente:</Text>
         <TextInput
-          style={[
-            styles.inputCEP,
-            cepNaoAplicavel && { backgroundColor: "#ddd" },
-          ]}
-          placeholder="CEP"
+          style={styles.input}
+          placeholder="Nome do Cliente"
           placeholderTextColor="#ccc"
-          value={cep}
-          onChangeText={async (value) => {
-            const cepFormatado = formatarCEP(value);
-            setCep(cepFormatado);
+          value={cliente}
+          onChangeText={setCliente}
+        />
+        <Text style={styles.label}>Empresa:</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Empresa"
+          placeholderTextColor="#ccc"
+          value={empresa}
+          onChangeText={setEmpresa}
+        />
 
-            const apenasNumeros = cepFormatado.replace(/\D/g, "");
+        <Text style={styles.label}>Descrição do Serviço:</Text>
+        <TextInput
+          style={[styles.input, { height: 100 }]}
+          placeholder="Descrição do Serviço"
+          placeholderTextColor="#ccc"
+          value={descricao}
+          onChangeText={setDescricao}
+          multiline
+        />
 
-            if (apenasNumeros.length === 8) {
-              setCarregandoCEP(true);
-              try {
-                const responseViaCEP = await fetch(
-                  `https://viacep.com.br/ws/${apenasNumeros}/json/`
-                );
-                if (!responseViaCEP.ok) throw new Error("ViaCEP fora do ar");
-
-                const dataViaCEP = await responseViaCEP.json();
-                if (dataViaCEP.erro)
-                  throw new Error("CEP não encontrado no ViaCEP");
-
-                const enderecoViaCEP = `${dataViaCEP.logradouro}, ${dataViaCEP.bairro}, ${dataViaCEP.localidade} - ${dataViaCEP.uf}`;
-                setEnderecoCompleto(enderecoViaCEP);
-                setLocalizacao(enderecoViaCEP);
-              } catch (errorViaCEP) {
-                try {
-                  const responseBrasilAPI = await fetch(
-                    `https://brasilapi.com.br/api/cep/v1/${apenasNumeros}`
-                  );
-                  if (!responseBrasilAPI.ok)
-                    throw new Error("Erro na BrasilAPI");
-
-                  const dataBrasil = await responseBrasilAPI.json();
-                  const enderecoBrasil = `${dataBrasil.street}, ${dataBrasil.neighborhood}, ${dataBrasil.city} - ${dataBrasil.state}`;
-                  setEnderecoCompleto(enderecoBrasil);
-                  setLocalizacao(enderecoBrasil);
-                } catch (errorBrasilAPI) {
-                  Alert.alert(
-                    "Erro",
-                    "Não foi possível buscar o endereço. Verifique o CEP ou tente mais tarde."
-                  );
-                  setEnderecoCompleto("");
-                }
-              } finally {
-                setCarregandoCEP(false);
+        <View style={styles.checkboxContainer}>
+          <TouchableOpacity
+            style={styles.checkbox}
+            onPress={() => {
+              const novoEstado = !cepNaoAplicavel;
+              setCepNaoAplicavel(novoEstado);
+              if (novoEstado) {
+                setCep("");
+                setEnderecoCompleto("");
+                setNumero("");
+                setLocalizacao("");
               }
-            } else {
-              setEnderecoCompleto("");
-            }
-          }}
-          keyboardType="numeric"
-          maxLength={9}
-          editable={!cepNaoAplicavel}
-        />
-
-        <TextInput
-          style={[
-            styles.inputCEP,
-            cepNaoAplicavel && { backgroundColor: "#ddd" },
-          ]}
-          placeholder="Número"
-          placeholderTextColor="#ccc"
-          value={numero}
-          onChangeText={setNumero}
-          keyboardType="numeric"
-          editable={!cepNaoAplicavel}
-        />
-      </View>
-
-      {carregandoCEP ? (
-        <ActivityIndicator
-          size="small"
-          color="#2e86de"
-          style={{ marginVertical: 10 }}
-        />
-      ) : enderecoCompleto ? (
-        <Text style={styles.enderecoPreview}>
-          Endereço: {enderecoCompleto}, {numero}
-        </Text>
-      ) : null}
-
-      {loadingImagem ? (
-        <ActivityIndicator
-          size="large"
-          color="#2e86de"
-          style={{ marginVertical: 15 }}
-        />
-      ) : (
-        <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
-          <MaterialIcons name="photo-camera" size={22} color="#fff" />
-          <Text style={styles.imageButtonText}>Adicionar Foto</Text>
-        </TouchableOpacity>
-      )}
-
-      {Platform.OS === "web" ? (
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: 12,
-            paddingHorizontal: 10,
-            marginBottom: 30,
-          }}
-        >
-          {fotosAntes.map((item, index) => (
-            <View key={index} style={styles.imagePreviewContainer}>
-              <Image source={{ uri: item }} style={styles.imagePreview} />
-              <TouchableOpacity
-                style={styles.removeImage}
-                onPress={() => handleRemoveImage(index)}
-              >
-                <Ionicons name="close-circle" size={22} color="#e74c3c" />
-              </TouchableOpacity>
-            </View>
-          ))}
+            }}
+          >
+            {cepNaoAplicavel ? (
+              <Ionicons name="checkbox" size={24} color="#2e86de" />
+            ) : (
+              <Ionicons name="square-outline" size={24} color="#ccc" />
+            )}
+            <Text style={styles.checkboxLabel}>Endereço"Não aplicável"</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <FlatList
-          data={fotosAntes}
-          horizontal
-          keyExtractor={(_, index) => index.toString()}
-          contentContainerStyle={{ paddingVertical: 10 }}
-          renderItem={({ item, index }) => (
-            <View style={styles.imagePreviewContainer}>
-              <Image source={{ uri: item }} style={styles.imagePreview} />
-              <TouchableOpacity
-                style={styles.removeImage}
-                onPress={() => handleRemoveImage(index)}
-              >
-                <Ionicons name="close-circle" size={22} color="#e74c3c" />
-              </TouchableOpacity>
-            </View>
-          )}
-        />
-      )}
 
-      {loadingOrdem ? (
-        <ActivityIndicator
-          size="large"
-          color="#27ae60"
-          style={{ marginVertical: 20 }}
-        />
-      ) : (
-        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-          <Ionicons
-            name="save-outline"
-            size={22}
-            color="#fff"
-            style={{ marginRight: 8 }}
+        <View style={styles.containerCEP}>
+          <TextInput
+            style={[
+              styles.inputCEP,
+              cepNaoAplicavel && { backgroundColor: "#ddd" },
+            ]}
+            placeholder="CEP"
+            placeholderTextColor="#ccc"
+            value={cep}
+            onChangeText={async (value) => {
+              const cepFormatado = formatarCEP(value);
+              setCep(cepFormatado);
+
+              const apenasNumeros = cepFormatado.replace(/\D/g, "");
+
+              if (apenasNumeros.length === 8) {
+                setCarregandoCEP(true);
+                try {
+                  const responseViaCEP = await fetch(
+                    `https://viacep.com.br/ws/${apenasNumeros}/json/`
+                  );
+                  if (!responseViaCEP.ok) throw new Error("ViaCEP fora do ar");
+
+                  const dataViaCEP = await responseViaCEP.json();
+                  if (dataViaCEP.erro)
+                    throw new Error("CEP não encontrado no ViaCEP");
+
+                  const enderecoViaCEP = `${dataViaCEP.logradouro}, ${dataViaCEP.bairro}, ${dataViaCEP.localidade} - ${dataViaCEP.uf}`;
+                  setEnderecoCompleto(enderecoViaCEP);
+                  setLocalizacao(enderecoViaCEP);
+                } catch (errorViaCEP) {
+                  try {
+                    const responseBrasilAPI = await fetch(
+                      `https://brasilapi.com.br/api/cep/v1/${apenasNumeros}`
+                    );
+                    if (!responseBrasilAPI.ok)
+                      throw new Error("Erro na BrasilAPI");
+
+                    const dataBrasil = await responseBrasilAPI.json();
+                    const enderecoBrasil = `${dataBrasil.street}, ${dataBrasil.neighborhood}, ${dataBrasil.city} - ${dataBrasil.state}`;
+                    setEnderecoCompleto(enderecoBrasil);
+                    setLocalizacao(enderecoBrasil);
+                  } catch (errorBrasilAPI) {
+                    Alert.alert(
+                      "Erro",
+                      "Não foi possível buscar o endereço. Verifique o CEP ou tente mais tarde."
+                    );
+                    setEnderecoCompleto("");
+                  }
+                } finally {
+                  setCarregandoCEP(false);
+                }
+              } else {
+                setEnderecoCompleto("");
+              }
+            }}
+            keyboardType="numeric"
+            maxLength={9}
+            editable={!cepNaoAplicavel}
           />
-          <Text style={styles.buttonText}>Salvar Ordem</Text>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
+
+          <TextInput
+            style={[
+              styles.inputCEP,
+              cepNaoAplicavel && { backgroundColor: "#ddd" },
+            ]}
+            placeholder="Número"
+            placeholderTextColor="#ccc"
+            value={numero}
+            onChangeText={setNumero}
+            keyboardType="numeric"
+            editable={!cepNaoAplicavel}
+          />
+        </View>
+
+        {carregandoCEP ? (
+          <ActivityIndicator
+            size="small"
+            color="#2e86de"
+            style={{ marginVertical: 10 }}
+          />
+        ) : enderecoCompleto ? (
+          <Text style={styles.enderecoPreview}>
+            Endereço: {enderecoCompleto}, {numero}
+          </Text>
+        ) : null}
+
+        {loadingImagem ? (
+          <ActivityIndicator
+            size="large"
+            color="#2e86de"
+            style={{ marginVertical: 15 }}
+          />
+        ) : (
+          <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
+            <MaterialIcons name="photo-camera" size={22} color="#fff" />
+            <Text style={styles.imageButtonText}>Adicionar Foto</Text>
+          </TouchableOpacity>
+        )}
+
+        {Platform.OS === "web" ? (
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              justifyContent: "center",
+              gap: 12,
+              paddingHorizontal: 10,
+              marginBottom: 30,
+            }}
+          >
+            {fotosAntes.map((item, index) => (
+              <View key={index} style={styles.imagePreviewContainer}>
+                <Image source={{ uri: item }} style={styles.imagePreview} />
+                <TouchableOpacity
+                  style={styles.removeImage}
+                  onPress={() => handleRemoveImage(index)}
+                >
+                  <Ionicons name="close-circle" size={22} color="#e74c3c" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <FlatList
+            data={fotosAntes}
+            horizontal
+            keyExtractor={(_, index) => index.toString()}
+            contentContainerStyle={{ paddingVertical: 10 }}
+            renderItem={({ item, index }) => (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: item }} style={styles.imagePreview} />
+                <TouchableOpacity
+                  style={styles.removeImage}
+                  onPress={() => handleRemoveImage(index)}
+                >
+                  <Ionicons name="close-circle" size={22} color="#e74c3c" />
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        )}
+
+        {loadingOrdem ? (
+          <ActivityIndicator
+            size="large"
+            color="#27ae60"
+            style={{ marginVertical: 20 }}
+          />
+        ) : (
+          <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+            <Ionicons
+              name="save-outline"
+              size={22}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={styles.buttonText}>Salvar Ordem</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+
+  bg: {
+    flex: 1,
+    alignItems: "center",
+    width: "100%",
+    height: "100%",
+  },
+
   container: {
-    padding: 20,
     backgroundColor: "#fff",
-    flexGrow: 1,
-    position: "relative",
+    padding: 20,
+    borderRadius: 20,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     ...(Platform.OS === "web"
       ? {
-          width: "70%",
-          maxWidth: "100%",
-          alignSelf: "center",
-          justifyContent: "center", // centraliza verticalmente
-          alignItems: "center", // centraliza horizontalmente
-          paddingTop: 40,
-          paddingBottom: 40,
-          borderRadius: 16,
-          marginVertical: "2%",
-        }
-      : {}),
+        width: 1000, // exatamente o mesmo tamanho da tela "visualizar"
+        maxWidth: "95%",
+        alignSelf: "center",
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: 30,
+        marginBottom: 30,
+      }
+      : {
+        flex: 1,
+        width: "115%",
+        marginVertical:10
+      }),
   },
+
 
   containerCEP: {
     flexDirection: "row",
@@ -497,8 +519,8 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     ...(Platform.OS === "web"
       ? {
-          fontSize: 16,
-        }
+        fontSize: 16,
+      }
       : {}),
   },
   input: {

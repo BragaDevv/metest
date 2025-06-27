@@ -500,10 +500,12 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  
   conteudo: {
-    flex: 1,
+    flex:1,
     backgroundColor: "#fff",
-    padding: 40,
+    padding: 20,
+    borderRadius: 20,
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 5, height: 5 },
@@ -518,11 +520,16 @@ const styles = StyleSheet.create({
           alignItems: "center", // centraliza horizontalmente
           paddingTop: 40,
           paddingBottom: 40,
-          borderRadius: 16,
           marginVertical: "2%",
         }
-      : {}),
+      : {
+        flex: 1,
+        width: "95%",
+        marginVertical:10
+      }),
   },
+
+
   title: {
     fontSize: 24,
     fontWeight: "bold",

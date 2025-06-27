@@ -30,7 +30,10 @@ export default function LoginScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedEmail || !trimmedPassword) {
       setErro("Preencha o e-mail e a senha.");
       return;
     }
@@ -38,8 +41,8 @@ export default function LoginScreen() {
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        email,
-        password
+        trimmedEmail,
+        trimmedPassword
       );
       console.log("✅ Login realizado:", userCredential.user.uid);
 
@@ -48,25 +51,24 @@ export default function LoginScreen() {
         await saveExpoPushToken(token);
       }
 
-      setErro(""); // limpa erro
-      navigation.replace("InicialScreen");
+      setErro("");
+
+      // Solução com fallback
+      setTimeout(() => {
+        navigation.replace("InicialScreen");
+      }, 100);
     } catch (error: any) {
       console.error("Erro ao logar:", error);
       let mensagem = "Erro ao tentar fazer login.";
-
-      if (error.code === "auth/user-not-found") {
-        mensagem = "Usuário não encontrado.";
-      } else if (error.code === "auth/wrong-password") {
-        mensagem = "Senha incorreta.";
-      } else if (error.code === "auth/invalid-email") {
-        mensagem = "E-mail inválido.";
-      } else if (error.code === "auth/too-many-requests") {
-        mensagem = "Muitas tentativas. Tente novamente mais tarde.";
-      }
+      if (error.code === "auth/user-not-found") mensagem = "Usuário não encontrado.";
+      else if (error.code === "auth/wrong-password") mensagem = "Senha incorreta.";
+      else if (error.code === "auth/invalid-email") mensagem = "E-mail inválido.";
+      else if (error.code === "auth/too-many-requests") mensagem = "Muitas tentativas. Tente novamente mais tarde.";
 
       setErro(mensagem);
     }
   };
+
 
   return (
     <KeyboardAvoidingView

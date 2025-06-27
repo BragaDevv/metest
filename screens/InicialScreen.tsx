@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     width: Platform.OS === "web" ? 520 : 280,
     height: Platform.OS === "web" ? 420 : 200,
     marginBottom: 10,
-    marginTop: Platform.OS === "web" ? "-20%" : "-20%",
+    marginTop: Platform.OS === "web" ? "-10%" : "-20%",
   },
   title: {
     fontSize: 28,
