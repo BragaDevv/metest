@@ -16,6 +16,8 @@ import { db } from "../firebaseConfig";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useAuth } from "@context/AuthContext";
+import * as Print from "expo-print";
+import { shareAsync } from "expo-sharing";
 
 interface Ordem {
   id: string;
@@ -74,51 +76,79 @@ export default function OrdensFinalizadasScreen() {
     carregarNome();
   }, [user]);
 
-  const gerarPDF = async (ordem: Ordem) => {
+
+
+  const gerarPDFLocal = async (ordem: Ordem) => {
     try {
-      // 🔧 Clona e sanitiza o objeto antes de logar
-      const ordemLog = {
-        ...ordem,
-        assinatura_cliente: ordem.assinatura_cliente?.startsWith("data:image")
-          ? "[assinatura_cliente base64 omitida]"
-          : ordem.assinatura_cliente,
-        assinatura_metest: ordem.assinatura_metest?.startsWith("data:image")
-          ? "[assinatura_metest base64 omitida]"
-          : ordem.assinatura_metest,
-      };
+      const fotosAntes = ordem.fotosAntes?.map(
+        (url) => `<img src="${url}" style="width:100%;margin-bottom:10px;" />`
+      ).join("") || "";
 
-      console.log("🔵 Enviando ordem para PDF:", ordemLog);
+      const fotosDepois = ordem.fotosDepois?.map(
+        (f) => `<img src="${f.url}" style="width:100%;margin-bottom:10px;" />`
+      ).join("") || "";
 
-      const response = await fetch(
-        "https://metest-backend.onrender.com/gerar-pdf",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(ordem),
+      const html = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Relatório METEST</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; }
+            h1 { color: #6c63ff; }
+            img { max-width: 100%; margin-top: 10px; border-radius: 8px; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório da Ordem nº ${ordem.numeroOrdem}</h1>
+          <p><strong>Cliente:</strong> ${ordem.cliente}</p>
+          <p><strong>Empresa:</strong> ${ordem.empresa}</p>
+          <p><strong>Descrição:</strong> ${ordem.descricao}</p>
+          <p><strong>Status:</strong> ${ordem.status}</p>
+          <p><strong>Serviço Realizado:</strong> ${ordem.descricaoFinal || "-"}</p>
+          <p><strong>Observações:</strong> ${ordem.observacoes || "-"}</p>
+          <h3>Fotos Antes:</h3>
+          ${fotosAntes}
+          <h3>Fotos Depois:</h3>
+          ${fotosDepois}
+          ${ordem.assinatura_cliente
+          ? `<h3>Assinatura Cliente:</h3><img src="${ordem.assinatura_cliente}" style="max-height:150px;" />`
+          : ""
         }
-      );
-
-      if (!response.ok) {
-        throw new Error("Erro ao gerar PDF");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+          ${ordem.assinatura_metest
+          ? `<h3>Assinatura METEST:</h3><img src="${ordem.assinatura_metest}" style="max-height:150px;" />`
+          : ""
+        }
+        </body>
+      </html>
+    `;
 
       if (Platform.OS === "web") {
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Relatorio_METEST_${ordem.numeroOrdem}.pdf`;
-        link.click();
+        // Web: cria blob e força download
+        const blob = new Blob([html], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        const iframe = document.createElement("iframe");
+        iframe.style.display = "none";
+        iframe.src = url;
+        document.body.appendChild(iframe);
+
+        iframe.onload = () => {
+          setTimeout(() => {
+            iframe.contentWindow?.print();
+          }, 500);
+        };
       } else {
-        Alert.alert("Abrindo PDF", "O PDF será aberto no navegador");
-        Linking.openURL(url);
+        const { uri } = await Print.printToFileAsync({ html });
+        await shareAsync(uri, { UTI: ".pdf", mimeType: "application/pdf" });
       }
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
-      Alert.alert("Erro", "Erro ao gerar PDF");
+      Alert.alert("Erro", "Falha ao gerar PDF");
     }
   };
+
+
+
 
   const fetchOrdensFinalizadas = async () => {
     try {
@@ -327,7 +357,7 @@ export default function OrdensFinalizadasScreen() {
         </View>
       )}
 
-      <TouchableOpacity style={styles.pdfButton} onPress={() => gerarPDF(item)}>
+      <TouchableOpacity style={styles.pdfButton} onPress={() => gerarPDFLocal(item)}>
         <Ionicons name="document" size={18} color="#fff" />
         <Text style={styles.buttonText}>Gerar PDF</Text>
       </TouchableOpacity>
@@ -372,20 +402,20 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-          width: "70%",
-          maxWidth: "100%",
-          alignSelf: "center",
-          justifyContent: "center", // centraliza verticalmente
-          alignItems: "center", // centraliza horizontalmente
-          paddingTop: 40,
-          paddingBottom: 40,
-          marginVertical: "2%",
-        }
+        width: "70%",
+        maxWidth: "100%",
+        alignSelf: "center",
+        justifyContent: "center", // centraliza verticalmente
+        alignItems: "center", // centraliza horizontalmente
+        paddingTop: 40,
+        paddingBottom: 40,
+        marginVertical: "2%",
+      }
       : {
-          flex: 1,
-          width: "95%",
-          marginVertical: 10,
-        }),
+        flex: 1,
+        width: "95%",
+        marginVertical: 10,
+      }),
   },
   title: {
     fontSize: 24,
@@ -407,8 +437,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-          width: 700,
-        }
+        width: 700,
+      }
       : {}),
   },
   numeroOrdem: {
