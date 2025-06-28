@@ -49,7 +49,7 @@ Notifications.setNotificationHandler({
 });
 
 const AppContent = () => {
-  const { loading } = useAuth();
+  const { user, tipo, loading } = useAuth();
 
   if (loading) {
     return (
@@ -59,62 +59,70 @@ const AppContent = () => {
     );
   }
 
-  return (
-    <NavigationContainer
-      linking={linking}
-      fallback={<Text>Carregando...</Text>}
-    >
-      <Stack.Navigator initialRouteName="LoginScreen">
+  const StackScreens = () => (
+    <Stack.Navigator>
+      {!user || !tipo ? (
         <Stack.Screen
           name="LoginScreen"
           component={LoginScreen}
           options={{ headerShown: false }}
         />
-        <Stack.Screen
-          name="InicialScreen"
-          component={InicialScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="OrdemScreen"
-          component={OrdemScreen}
-          options={{ headerShown: Platform.OS !== "web", title: "" }}
-        />
-        <Stack.Screen
-          name="VisualizarScreen"
-          component={VisualizarScreen}
-          options={{ headerShown: Platform.OS !== "web", title: "" }}
-        />
-        <Stack.Screen
-          name="FinalizarScreen"
-          component={FinalizarScreen}
-          options={{ headerShown: Platform.OS !== "web", title: "" }}
-        />
-        <Stack.Screen
-          name="FinalizadasScreen"
-          component={FinalizadasScreen}
-          options={{ headerShown: Platform.OS !== "web", title: "" }}
-        />
-        <Stack.Screen
-          name="AssinaturaScreen"
-          component={AssinaturaScreen}
-          options={{ headerShown: Platform.OS !== "web", title: "" }}
-        />
-        <Stack.Screen
-          name="CadastroScreen"
-          component={CadastroScreen}
-          options={{ headerShown: Platform.OS !== "web", title: "" }}
-        />
-        <Stack.Screen
-          name="AdminPainelScreen"
-          component={AdminPainelScreen}
-          options={{ headerShown: Platform.OS !== "web", title: "" }}
-        />
-      </Stack.Navigator>
+      ) : (
+        <>
+          <Stack.Screen
+            name="InicialScreen"
+            component={InicialScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="OrdemScreen"
+            component={OrdemScreen}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
+          />
+          <Stack.Screen
+            name="VisualizarScreen"
+            component={VisualizarScreen}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
+          />
+          <Stack.Screen
+            name="FinalizarScreen"
+            component={FinalizarScreen}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
+          />
+          <Stack.Screen
+            name="FinalizadasScreen"
+            component={FinalizadasScreen}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
+          />
+          <Stack.Screen
+            name="AssinaturaScreen"
+            component={AssinaturaScreen}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
+          />
+          <Stack.Screen
+            name="CadastroScreen"
+            component={CadastroScreen}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
+          />
+          <Stack.Screen
+            name="AdminPainelScreen"
+            component={AdminPainelScreen}
+            options={{ headerShown: Platform.OS !== "web", title: "" }}
+          />
+        </>
+      )}
+    </Stack.Navigator>
+  );
+
+  return (
+    <NavigationContainer
+      linking={linking}
+      fallback={<Text>Carregando...</Text>}
+    >
+      <StackScreens />
     </NavigationContainer>
   );
 };
-
 
 export default function App() {
   const notificationListener = useRef<Notifications.Subscription | null>(null);

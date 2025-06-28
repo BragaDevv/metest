@@ -23,7 +23,6 @@ import SignatureScreen from "react-native-signature-canvas";
 import * as Location from "expo-location";
 import * as ImageManipulator from "expo-image-manipulator";
 
-
 interface RouteParams {
   ordemId: string;
 }
@@ -56,6 +55,37 @@ export default function FinalizarOrdemScreen() {
 
   const [finalizando, setFinalizando] = useState(false);
 
+  const uploadAssinaturaParaCloudinary = async (base64: string) => {
+    console.log("📤 Enviando assinatura para Cloudinary...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", base64); // precisa ser "data:image/png;base64,..." completo
+      formData.append("upload_preset", UPLOAD_PRESET);
+
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const result = await res.json();
+      console.log("🌐 Resposta Cloudinary:", result);
+
+      if (!result.secure_url) {
+        console.warn("⚠️ URL da assinatura está vazia ou inválida.");
+        return undefined;
+      }
+
+      console.log("✅ URL da assinatura:", result.secure_url);
+      return result.secure_url;
+    } catch (error) {
+      console.error("❌ Erro ao enviar assinatura para Cloudinary:", error);
+      return undefined;
+    }
+  };
 
   const handleFinalizar = async () => {
     if (!descricaoFinal || !responsavel || !assinatura) {
@@ -66,15 +96,23 @@ export default function FinalizarOrdemScreen() {
     setFinalizando(true);
 
     try {
+      const urlAssinaturaCliente = await uploadAssinaturaParaCloudinary(
+        assinatura
+      );
+      console.log("✅ URL da assinatura cliente:", urlAssinaturaCliente); // ✅ Aqui o log certo
+      setAssinatura(""); // opcional: limpa o base64 da memória
+
       await updateDoc(doc(db, "ordens_servico", ordemId), {
         status: "aguardando_assinatura",
         descricaoFinal,
         observacoes,
         fotosDepois: fotos,
         responsavel,
-        assinatura_cliente: assinatura,
+        assinatura_cliente: urlAssinaturaCliente,
         finalizadoEm: serverTimestamp(),
       });
+
+      // ...continua
 
       await fetch("https://metest-backend.onrender.com/api/send-to-admins", {
         method: "POST",
@@ -93,7 +131,6 @@ export default function FinalizarOrdemScreen() {
       setFinalizando(false);
     }
   };
-
 
   const escolherFoto = async () => {
     const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
@@ -176,8 +213,6 @@ export default function FinalizarOrdemScreen() {
     }
   };
 
-
-
   const removerFoto = (index: number) => {
     const novas = [...fotos];
     novas.splice(index, 1);
@@ -235,7 +270,10 @@ export default function FinalizarOrdemScreen() {
         )}
 
         {assinatura ? (
-          <Image source={{ uri: assinatura }} style={styles.assinaturaPreview} />
+          <Image
+            source={{ uri: assinatura }}
+            style={styles.assinaturaPreview}
+          />
         ) : null}
 
         <Modal visible={showSignature} transparent animationType="fade">
@@ -256,9 +294,9 @@ export default function FinalizarOrdemScreen() {
                 overflow: "hidden",
                 ...(Platform.OS === "web"
                   ? {
-                    width: "30%",
-                    height: "70%",
-                  }
+                      width: "30%",
+                      height: "70%",
+                    }
                   : {}),
               }}
             >
@@ -272,7 +310,9 @@ export default function FinalizarOrdemScreen() {
                   paddingVertical: 10,
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>
+                <Text
+                  style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}
+                >
                   ✍️ Assine abaixo
                 </Text>
                 <TouchableOpacity
@@ -284,7 +324,9 @@ export default function FinalizarOrdemScreen() {
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "bold" }}>Fechar</Text>
+                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                    Fechar
+                  </Text>
                 </TouchableOpacity>
               </View>
 
@@ -302,14 +344,15 @@ export default function FinalizarOrdemScreen() {
           </View>
         </Modal>
 
-
         <TouchableOpacity style={styles.addPhotoButton} onPress={escolherFoto}>
           <Text style={styles.buttonText}>Tirar Foto</Text>
         </TouchableOpacity>
         {carregandoFoto && (
           <View style={{ marginVertical: 10 }}>
             <ActivityIndicator size="large" color="#007bff" />
-            <Text style={{ textAlign: "center", color: "#007bff", marginTop: 5 }}>
+            <Text
+              style={{ textAlign: "center", color: "#007bff", marginTop: 5 }}
+            >
               Enviando foto...
             </Text>
           </View>
@@ -350,7 +393,6 @@ export default function FinalizarOrdemScreen() {
             <Text style={styles.buttonText}>Finalizar Ordem</Text>
           )}
         </TouchableOpacity>
-
       </ScrollView>
     </ImageBackground>
   );
@@ -375,20 +417,20 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-        width: 1000, // exatamente o mesmo tamanho da tela "visualizar"
-        maxWidth: "95%",
-        alignSelf: "center",
-        justifyContent: "center",
-        alignItems: "center",
-        marginTop: 27,
-        marginBottom: 30,
-      }
+          width: 1000, // exatamente o mesmo tamanho da tela "visualizar"
+          maxWidth: "95%",
+          alignSelf: "center",
+          justifyContent: "center",
+          alignItems: "center",
+          marginTop: 27,
+          marginBottom: 30,
+        }
       : {
-        flex: 1,
-        minWidth: 360,
-        maxWidth: 360,
-        marginVertical: 10
-      }),
+          flex: 1,
+          minWidth: 360,
+          maxWidth: 360,
+          marginVertical: 10,
+        }),
   },
   title: {
     fontSize: 24,
@@ -398,8 +440,8 @@ const styles = StyleSheet.create({
     color: "#000",
     ...(Platform.OS === "web"
       ? {
-        fontSize: 48,
-      }
+          fontSize: 48,
+        }
       : {}),
   },
   label: {
@@ -409,8 +451,8 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     ...(Platform.OS === "web"
       ? {
-        fontSize: 16,
-      }
+          fontSize: 16,
+        }
       : {}),
   },
   input: {

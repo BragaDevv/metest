@@ -9,12 +9,11 @@ import {
   Alert,
   ImageBackground,
   Platform,
+  Linking,
 } from "react-native";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 import { Ionicons } from "@expo/vector-icons";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
 import * as Location from "expo-location";
 import { useAuth } from "@context/AuthContext";
 
@@ -75,6 +74,52 @@ export default function OrdensFinalizadasScreen() {
     carregarNome();
   }, [user]);
 
+  const gerarPDF = async (ordem: Ordem) => {
+    try {
+      // 🔧 Clona e sanitiza o objeto antes de logar
+      const ordemLog = {
+        ...ordem,
+        assinatura_cliente: ordem.assinatura_cliente?.startsWith("data:image")
+          ? "[assinatura_cliente base64 omitida]"
+          : ordem.assinatura_cliente,
+        assinatura_metest: ordem.assinatura_metest?.startsWith("data:image")
+          ? "[assinatura_metest base64 omitida]"
+          : ordem.assinatura_metest,
+      };
+
+      console.log("🔵 Enviando ordem para PDF:", ordemLog);
+
+      const response = await fetch(
+        "https://metest-backend.onrender.com/gerar-pdf",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(ordem),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Erro ao gerar PDF");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      if (Platform.OS === "web") {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Relatorio_METEST_${ordem.numeroOrdem}.pdf`;
+        link.click();
+      } else {
+        Alert.alert("Abrindo PDF", "O PDF será aberto no navegador");
+        Linking.openURL(url);
+      }
+    } catch (err) {
+      console.error("Erro ao gerar PDF:", err);
+      Alert.alert("Erro", "Erro ao gerar PDF");
+    }
+  };
+
   const fetchOrdensFinalizadas = async () => {
     try {
       const snapshot = await getDocs(collection(db, "ordens_servico"));
@@ -94,102 +139,6 @@ export default function OrdensFinalizadasScreen() {
   const toggleDetalhes = (id: string) => {
     setDetalhesVisiveis(detalhesVisiveis === id ? null : id);
   };
-
-  const getAssinaturaUri = (assinatura: string) => assinatura;
-
-  const gerarPDF = async (ordem: Ordem) => {
-    const logoUrl = "https://res.cloudinary.com/dy48gdjlv/image/upload/v1750811880/logo-metest_f9wxzj.png";
-    const dataHora = ordem.finalizadoEm?.seconds
-      ? new Date(ordem.finalizadoEm.seconds * 1000).toLocaleString("pt-BR")
-      : new Date().toLocaleString("pt-BR");
-
-    const fotosHtml = ordem.fotosDepois?.length
-      ? ordem.fotosDepois
-        .map(
-          (foto) => `
-        <div style="margin: 4px 0; text-align: center;">
-          <img src="${foto.url.replace('/upload/', '/upload/f_jpg/')}" 
-               style="width: 150px; height: 100px; object-fit: cover; border-radius: 4px;" />
-          <p style="font-size: 8px;">
-            📍 ${foto.latitude.toFixed(5)}, ${foto.longitude.toFixed(5)}<br/>
-            🕒 ${new Date(foto.timestamp).toLocaleString("pt-BR")}
-          </p>
-        </div>
-      `
-        )
-        .join("")
-      : "<p style='font-style: italic;'>Sem fotos disponíveis.</p>";
-
-
-    const htmlContent = `
-    <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; font-size: 11px; color: #333; padding: 10px; }
-          .logo { width: 150px; margin-bottom: 10px; }
-          .section { margin-bottom: 15px; }
-          .assinatura img { width: 180px; height: 70px; border: 1px solid #ccc; object-fit: contain; }
-        </style>
-      </head>
-      <body>
-        <div style="text-align:center;">
-          <img src="${logoUrl}" class="logo" />
-          <h2>Relatório Fotográfico - METEST</h2>
-          <p><em>Gerado em: ${dataHora}</em></p>
-        </div>
-
-        <div class="section">
-          <strong>Ordem:</strong> ${ordem.numeroOrdem}<br/>
-          <strong>Cliente:</strong> ${ordem.cliente} - ${ordem.empresa}<br/>
-          <strong>Executado por:</strong> ${ordem.executadoPorNome}<br/>
-          <strong>Serviço:</strong> ${ordem.descricaoFinal || ordem.descricao}<br/>
-          <strong>Local:</strong> ${ordem.localizacao}
-        </div>
-
-        <div class="section">
-          <strong>Fotos do Serviço:</strong><br/>
-          ${fotosHtml}
-        </div>
-
-        <div class="section" style="display: flex; justify-content: space-between;">
-          <div class="assinatura">
-            <strong>Assinatura Cliente</strong><br/>
-            ${ordem.assinatura_cliente
-        ? `<img src="${ordem.assinatura_cliente}" />`
-        : "Sem assinatura"
-      }
-          </div>
-          <div class="assinatura">
-            <strong>Assinatura METEST</strong><br/>
-            ${ordem.assinatura_metest
-        ? `<img src="${ordem.assinatura_metest}" />`
-        : "Sem assinatura"
-      }
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-
-    if (Platform.OS === "web") {
-      const { base64 } = await Print.printToFileAsync({
-        html: htmlContent,
-        base64: true,
-      });
-
-      const link = document.createElement("a");
-      link.href = `data:application/pdf;base64,${base64}`;
-      link.download = `Relatorio_METEST_${ordem.numeroOrdem}.pdf`;
-      link.click();
-    } else {
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      await Sharing.shareAsync(uri);
-    }
-
-
-
-  };
-
 
   const renderItem = ({ item }: { item: Ordem }) => (
     <View style={styles.card}>
@@ -344,7 +293,7 @@ export default function OrdensFinalizadasScreen() {
             <View>
               <Text style={styles.label}>Assinatura do Cliente:</Text>
               <Image
-                source={{ uri: getAssinaturaUri(item.assinatura_cliente) }}
+                source={{ uri: item.assinatura_cliente }}
                 style={{
                   width: 200,
                   height: 100,
@@ -363,7 +312,7 @@ export default function OrdensFinalizadasScreen() {
                 Assinatura Metest : {nome ? nome : user?.email}
               </Text>
               <Image
-                source={{ uri: getAssinaturaUri(item.assinatura_metest) }}
+                source={{ uri: item.assinatura_metest }}
                 style={{
                   width: 200,
                   height: 100,
@@ -423,20 +372,20 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-        width: "70%",
-        maxWidth: "100%",
-        alignSelf: "center",
-        justifyContent: "center", // centraliza verticalmente
-        alignItems: "center", // centraliza horizontalmente
-        paddingTop: 40,
-        paddingBottom: 40,
-        marginVertical: "2%",
-      }
+          width: "70%",
+          maxWidth: "100%",
+          alignSelf: "center",
+          justifyContent: "center", // centraliza verticalmente
+          alignItems: "center", // centraliza horizontalmente
+          paddingTop: 40,
+          paddingBottom: 40,
+          marginVertical: "2%",
+        }
       : {
-        flex: 1,
-        width: "95%",
-        marginVertical: 10
-      }),
+          flex: 1,
+          width: "95%",
+          marginVertical: 10,
+        }),
   },
   title: {
     fontSize: 24,
@@ -458,8 +407,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-        width: 700,
-      }
+          width: 700,
+        }
       : {}),
   },
   numeroOrdem: {

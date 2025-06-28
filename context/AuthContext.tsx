@@ -82,6 +82,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    console.log("🔄 Loading:", loading, "| Tipo:", tipo);
+  }, [loading, tipo]);
+
   // ⏬ Login manual
   const login = async (email: string, password: string) => {
     setLoading(true);
@@ -116,7 +120,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setLoading(false);
     }
   };
-
 
   const logout = async () => {
     setLoading(true);

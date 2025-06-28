@@ -59,6 +59,9 @@ interface Ordem {
   };
 }
 
+const CLOUD_NAME = "dy48gdjlv";
+const UPLOAD_PRESET = "metest_unsigned";
+
 export default function AguardandoAssinaturaScreen() {
   const { user, tipo, logout } = useAuth();
   const [ordensAguardando, setOrdensAguardando] = useState<Ordem[]>([]);
@@ -139,11 +142,39 @@ export default function AguardandoAssinaturaScreen() {
     setDetalhesVisiveis(detalhesVisiveis === id ? null : id);
   };
 
-  const getAssinaturaUri = (assinaturaBase64?: string): string | undefined => {
-    if (!assinaturaBase64) return undefined;
-    if (assinaturaBase64.startsWith("data:image")) return assinaturaBase64;
-    return `data:image/png;base64,${assinaturaBase64}`;
-  };
+const uploadAssinaturaParaCloudinary = async (base64: string) => {
+  console.log("📤 Enviando assinatura para Cloudinary...");
+
+  try {
+    const formData = new FormData();
+    formData.append("file", base64); // precisa ser "data:image/png;base64,..." completo
+    formData.append("upload_preset", UPLOAD_PRESET);
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const result = await res.json();
+    console.log("🌐 Resposta Cloudinary:", result);
+
+    if (!result.secure_url) {
+      console.warn("⚠️ URL da assinatura está vazia ou inválida.");
+      return undefined;
+    }
+
+    console.log("✅ URL da assinatura:", result.secure_url);
+    return result.secure_url;
+  } catch (error) {
+    console.error("❌ Erro ao enviar assinatura para Cloudinary:", error);
+    return undefined;
+  }
+};
+
+
 
   const renderItem = ({ item }: { item: Ordem }) => (
     <View style={styles.card}>
@@ -301,10 +332,14 @@ export default function AguardandoAssinaturaScreen() {
                 </Text>
                 <TouchableOpacity
                   style={{
-                    position: "relative", left: -50, top: 4, ...(Platform.OS === "web"
+                    position: "relative",
+                    left: -50,
+                    top: 4,
+                    ...(Platform.OS === "web"
                       ? {
-                        left: 30, top: 0
-                      }
+                          left: 30,
+                          top: 0,
+                        }
                       : {}),
                   }}
                   onPress={async () => {
@@ -355,7 +390,7 @@ export default function AguardandoAssinaturaScreen() {
             <View>
               <Text style={styles.label}>Assinatura do Cliente:</Text>
               <Image
-                source={{ uri: getAssinaturaUri(item.assinatura_cliente) }}
+                source={{ uri: item.assinatura_cliente }}
                 style={{
                   width: 200,
                   height: 100,
@@ -373,7 +408,7 @@ export default function AguardandoAssinaturaScreen() {
           )}
 
           {item.assinatura_metest ||
-            (item.id === assinaturaCapturadaPara && assinaturaTemp) ? (
+          (item.id === assinaturaCapturadaPara && assinaturaTemp) ? (
             <View>
               <Text style={styles.label}>Assinatura Metest:</Text>
               <Image
@@ -381,7 +416,7 @@ export default function AguardandoAssinaturaScreen() {
                   uri:
                     item.id === assinaturaCapturadaPara && assinaturaTemp
                       ? assinaturaTemp
-                      : getAssinaturaUri(item.assinatura_metest),
+                      : item.assinatura_metest,
                 }}
                 style={{
                   width: 200,
@@ -406,19 +441,44 @@ export default function AguardandoAssinaturaScreen() {
           <TouchableOpacity
             style={[styles.assinarButton, { backgroundColor: "#007bff" }]}
             onPress={async () => {
+              if (!assinaturaTemp) {
+                Alert.alert(
+                  "Erro",
+                  "Assinatura não capturada. Por favor, assine antes de finalizar."
+                );
+                return;
+              }
+
               try {
+                console.log("📤 Enviando assinatura para Cloudinary...");
+                const urlAssinatura = await uploadAssinaturaParaCloudinary(
+                  assinaturaTemp
+                );
+                console.log("✅ URL da assinatura:", urlAssinatura);
+
+                if (!urlAssinatura) {
+                  console.warn("⚠️ URL da assinatura está vazia ou inválida.");
+                  Alert.alert(
+                    "Erro",
+                    "Falha ao obter a URL da assinatura. Tente novamente."
+                  );
+                  return;
+                }
+
                 await updateDoc(doc(db, "ordens_servico", item.id), {
                   status: "finalizada",
-                  assinatura_metest: assinaturaTemp,
-                  assinatura_metest_nome: nome,
+                  assinatura_metest: urlAssinatura,
+                  assinatura_metest_nome: nome || "Desconhecido",
                   finalizadoEm: new Date(),
                 });
+
+                console.log("✅ Ordem finalizada com sucesso no Firestore");
                 setAssinaturaTemp(null);
                 setAssinaturaCapturadaPara(null);
                 fetchOrdensAguardando();
                 Alert.alert("✅ Ordem finalizada com sucesso!");
               } catch (error) {
-                console.error("Erro ao finalizar ordem:", error);
+                console.error("❌ Erro ao finalizar ordem:", error);
                 Alert.alert("Erro ao finalizar ordem");
               }
             }}
@@ -450,8 +510,6 @@ export default function AguardandoAssinaturaScreen() {
           ✍️ Assinatura disponível apenas no mobile.
         </Text>
       )}
-
-
     </View>
   );
 
@@ -557,7 +615,6 @@ export default function AguardandoAssinaturaScreen() {
                   </>
                 )}
 
-
                 <TouchableOpacity
                   style={styles.modalCloseButton}
                   onPress={() => setModalVisible(false)}
@@ -581,7 +638,9 @@ export default function AguardandoAssinaturaScreen() {
             }}
           >
             {fotoSelecionada && (
-              <View style={{ width: "90%", height: "70%", position: "relative" }}>
+              <View
+                style={{ width: "90%", height: "70%", position: "relative" }}
+              >
                 <Image
                   source={{ uri: fotoSelecionada }}
                   style={{ width: "100%", height: "100%", borderRadius: 10 }}
@@ -601,9 +660,9 @@ export default function AguardandoAssinaturaScreen() {
                       fontSize: 12,
                       ...(Platform.OS === "web"
                         ? {
-                          bottom: 10,
-                          left: 450,
-                        }
+                            bottom: 10,
+                            left: 450,
+                          }
                         : {}),
                     }}
                   >
@@ -625,9 +684,9 @@ export default function AguardandoAssinaturaScreen() {
                       fontSize: 12,
                       ...(Platform.OS === "web"
                         ? {
-                          bottom: 40,
-                          left: 450,
-                        }
+                            bottom: 40,
+                            left: 450,
+                          }
                         : {}),
                     }}
                   >
@@ -687,22 +746,21 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-        width: "70%",
-        maxWidth: "100%",
-        alignSelf: "center",
-        justifyContent: "center", // centraliza verticalmente
-        alignItems: "center", // centraliza horizontalmente
-        paddingTop: 40,
-        paddingBottom: 40,
-        marginVertical: "2%",
-      }
+          width: "70%",
+          maxWidth: "100%",
+          alignSelf: "center",
+          justifyContent: "center", // centraliza verticalmente
+          alignItems: "center", // centraliza horizontalmente
+          paddingTop: 40,
+          paddingBottom: 40,
+          marginVertical: "2%",
+        }
       : {
-        flex: 1,
-        width: "95%",
-        marginVertical: 10
-      }),
+          flex: 1,
+          width: "95%",
+          marginVertical: 10,
+        }),
   },
-
 
   title: {
     fontSize: 24,
@@ -724,8 +782,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-        width: 700,
-      }
+          width: 700,
+        }
       : {}),
   },
   numeroOrdem: {
@@ -778,9 +836,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...(Platform.OS === "web"
       ? {
-        width: '30%',
-        height: "70%",
-      }
+          width: "30%",
+          height: "70%",
+        }
       : {}),
   },
   modalHeader: {
@@ -864,9 +922,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     ...(Platform.OS === "web"
       ? {
-        top: -30,
-        left: 450,
-      }
+          top: -30,
+          left: 450,
+        }
       : {}),
   },
 });
