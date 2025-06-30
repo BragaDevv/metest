@@ -142,37 +142,37 @@ export default function AguardandoAssinaturaScreen() {
     setDetalhesVisiveis(detalhesVisiveis === id ? null : id);
   };
 
-const uploadAssinaturaParaCloudinary = async (base64: string) => {
-  console.log("📤 Enviando assinatura para Cloudinary...");
+  const uploadAssinaturaParaCloudinary = async (base64: string) => {
+    console.log("📤 Enviando assinatura para Cloudinary...");
 
-  try {
-    const formData = new FormData();
-    formData.append("file", base64); // precisa ser "data:image/png;base64,..." completo
-    formData.append("upload_preset", UPLOAD_PRESET);
+    try {
+      const formData = new FormData();
+      formData.append("file", base64); // precisa ser "data:image/png;base64,..." completo
+      formData.append("upload_preset", UPLOAD_PRESET);
 
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-      {
-        method: "POST",
-        body: formData,
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const result = await res.json();
+      console.log("🌐 Resposta Cloudinary:", result);
+
+      if (!result.secure_url) {
+        console.warn("⚠️ URL da assinatura está vazia ou inválida.");
+        return undefined;
       }
-    );
 
-    const result = await res.json();
-    console.log("🌐 Resposta Cloudinary:", result);
-
-    if (!result.secure_url) {
-      console.warn("⚠️ URL da assinatura está vazia ou inválida.");
+      console.log("✅ URL da assinatura:", result.secure_url);
+      return result.secure_url;
+    } catch (error) {
+      console.error("❌ Erro ao enviar assinatura para Cloudinary:", error);
       return undefined;
     }
-
-    console.log("✅ URL da assinatura:", result.secure_url);
-    return result.secure_url;
-  } catch (error) {
-    console.error("❌ Erro ao enviar assinatura para Cloudinary:", error);
-    return undefined;
-  }
-};
+  };
 
 
 
@@ -337,9 +337,9 @@ const uploadAssinaturaParaCloudinary = async (base64: string) => {
                     top: 4,
                     ...(Platform.OS === "web"
                       ? {
-                          left: 30,
-                          top: 0,
-                        }
+                        left: 30,
+                        top: 0,
+                      }
                       : {}),
                   }}
                   onPress={async () => {
@@ -408,7 +408,7 @@ const uploadAssinaturaParaCloudinary = async (base64: string) => {
           )}
 
           {item.assinatura_metest ||
-          (item.id === assinaturaCapturadaPara && assinaturaTemp) ? (
+            (item.id === assinaturaCapturadaPara && assinaturaTemp) ? (
             <View>
               <Text style={styles.label}>Assinatura Metest:</Text>
               <Image
@@ -529,237 +529,226 @@ const uploadAssinaturaParaCloudinary = async (base64: string) => {
 `;
 
   return (
-    <ImageBackground
-      source={require("../assets/images/bgAll.jpg")}
-      style={styles.container}
-      resizeMode="stretch"
-    >
-      <View style={styles.conteudo}>
-        <Text style={styles.title}>Aguardando Assinatura</Text>
-        {ordensAguardando.length === 0 ? (
-          <View style={styles.semOrdensContainer}>
-            <Text style={styles.semOrdensTexto}>
-              📭 Nenhuma ordem aguardando assinatura no momento.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={ordensAguardando}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            contentContainerStyle={{ paddingBottom: 30 }}
-          />
-        )}
+    <View style={styles.conteudo}>
+      <Text style={styles.title}>Aguardando Assinatura</Text>
+      {ordensAguardando.length === 0 ? (
+        <View style={styles.semOrdensContainer}>
+          <Text style={styles.semOrdensTexto}>
+            📭 Nenhuma ordem aguardando assinatura no momento.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={ordensAguardando}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 30 }}
+        />
+      )}
 
-        <Modal visible={!!assinaturaVisivel} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>✍️ Assine abaixo</Text>
-                <TouchableOpacity
-                  onPress={() => setAssinaturaVisivel(null)}
-                  style={styles.modalCloseBtn}
-                >
-                  <Text style={styles.modalCloseText}>Fechar</Text>
-                </TouchableOpacity>
-              </View>
-
-              <SignatureScreen
-                onOK={(result) => {
-                  setAssinaturaTemp(result);
-                  setAssinaturaVisivel(null);
-                }}
-                onEmpty={() => Alert.alert("Assinatura vazia")}
-                descriptionText=""
-                clearText="Limpar"
-                confirmText="Salvar"
-              />
-            </View>
-          </View>
-        </Modal>
-
-        <Modal visible={modalVisible} animationType="slide" transparent={true}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitleMaps}>
-                  Localização do Executante
-                </Text>
-
-                {localSelecionado && (
-                  <>
-                    {Platform.OS !== "web" && localSelecionado.localizacao && (
-                      <Text style={styles.modalEndereco}>
-                        {localSelecionado.localizacao}
-                      </Text>
-                    )}
-
-                    <View style={styles.modalMap}>
-                      {Platform.OS === "web" ? (
-                        <iframe
-                          width="100%"
-                          height="300"
-                          style={{ border: 0, borderRadius: 10 }}
-                          loading="lazy"
-                          allowFullScreen
-                          src={`https://maps.google.com/maps?q=${localSelecionado.latitude},${localSelecionado.longitude}&z=17&output=embed`}
-                        />
-                      ) : (
-                        <WebView
-                          originWhitelist={["*"]}
-                          source={{ html: iframeHtml }}
-                          style={{ height: 300, borderRadius: 10 }}
-                        />
-                      )}
-                    </View>
-                  </>
-                )}
-
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                    Fechar
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        <Modal visible={modalFotoVisivel} transparent animationType="fade">
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "rgba(0,0,0,0.9)",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            {fotoSelecionada && (
-              <View
-                style={{ width: "90%", height: "70%", position: "relative" }}
+      <Modal visible={!!assinaturaVisivel} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>✍️ Assine abaixo</Text>
+              <TouchableOpacity
+                onPress={() => setAssinaturaVisivel(null)}
+                style={styles.modalCloseBtn}
               >
-                <Image
-                  source={{ uri: fotoSelecionada }}
-                  style={{ width: "100%", height: "100%", borderRadius: 10 }}
-                  resizeMode="contain"
-                />
-                {coordenadasSelecionadas && (
-                  <Text
-                    style={{
-                      position: "absolute",
-                      bottom: 70,
-                      left: 12,
-                      color: "#000",
-                      backgroundColor: "#fff",
-                      paddingHorizontal: 5,
-                      paddingVertical: 4,
-                      borderRadius: 0,
-                      fontSize: 12,
-                      ...(Platform.OS === "web"
-                        ? {
-                            bottom: 10,
-                            left: 450,
-                          }
-                        : {}),
-                    }}
-                  >
-                    {coordenadasSelecionadas.lat.toFixed(5)},{" "}
-                    {coordenadasSelecionadas.lng.toFixed(5)}
-                  </Text>
-                )}
-                {timestampSelecionado && (
-                  <Text
-                    style={{
-                      position: "absolute",
-                      bottom: 70,
-                      left: 150,
-                      color: "#000",
-                      backgroundColor: "#fff",
-                      paddingHorizontal: 5,
-                      paddingVertical: 4,
-                      borderRadius: 0,
-                      fontSize: 12,
-                      ...(Platform.OS === "web"
-                        ? {
-                            bottom: 40,
-                            left: 450,
-                          }
-                        : {}),
-                    }}
-                  >
-                    {new Date(timestampSelecionado).toLocaleString("pt-BR")}
-                  </Text>
-                )}
-                <TouchableOpacity
+                <Text style={styles.modalCloseText}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+
+            <SignatureScreen
+              onOK={(result) => {
+                setAssinaturaTemp(result);
+                setAssinaturaVisivel(null);
+              }}
+              onEmpty={() => Alert.alert("Assinatura vazia")}
+              descriptionText=""
+              clearText="Limpar"
+              confirmText="Salvar"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitleMaps}>
+                Localização do Executante
+              </Text>
+
+              {localSelecionado && (
+                <>
+                  {Platform.OS !== "web" && localSelecionado.localizacao && (
+                    <Text style={styles.modalEndereco}>
+                      {localSelecionado.localizacao}
+                    </Text>
+                  )}
+
+                  <View style={styles.modalMap}>
+                    {Platform.OS === "web" ? (
+                      <iframe
+                        width="100%"
+                        height="300"
+                        style={{ border: 0, borderRadius: 10 }}
+                        loading="lazy"
+                        allowFullScreen
+                        src={`https://maps.google.com/maps?q=${localSelecionado.latitude},${localSelecionado.longitude}&z=17&output=embed`}
+                      />
+                    ) : (
+                      <WebView
+                        originWhitelist={["*"]}
+                        source={{ html: iframeHtml }}
+                        style={{ height: 300, borderRadius: 10 }}
+                      />
+                    )}
+                  </View>
+                </>
+              )}
+
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Fechar
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={modalFotoVisivel} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.9)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {fotoSelecionada && (
+            <View
+              style={{ width: "90%", height: "70%", position: "relative" }}
+            >
+              <Image
+                source={{ uri: fotoSelecionada }}
+                style={{ width: "100%", height: "100%", borderRadius: 10 }}
+                resizeMode="contain"
+              />
+              {coordenadasSelecionadas && (
+                <Text
                   style={{
                     position: "absolute",
-                    top: 20,
-                    right: 20,
-                    backgroundColor: "#e74c3c",
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 8,
-                  }}
-                  onPress={() => {
-                    setModalFotoVisivel(false);
-                    setFotoSelecionada(null);
-                    setCoordenadasSelecionadas(null);
+                    bottom: 70,
+                    left: 12,
+                    color: "#000",
+                    backgroundColor: "#fff",
+                    paddingHorizontal: 5,
+                    paddingVertical: 4,
+                    borderRadius: 0,
+                    fontSize: 12,
+                    ...(Platform.OS === "web"
+                      ? {
+                        bottom: 10,
+                        left: 450,
+                      }
+                      : {}),
                   }}
                 >
-                  <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                    Fechar
-                  </Text>
-                </TouchableOpacity>
-                <Image
-                  source={require("../assets/images/logo-metest.png")}
-                  style={styles.logoFoto}
-                  resizeMode="contain"
-                />
-              </View>
-            )}
-          </View>
-        </Modal>
-      </View>
-    </ImageBackground>
+                  {coordenadasSelecionadas.lat.toFixed(5)},{" "}
+                  {coordenadasSelecionadas.lng.toFixed(5)}
+                </Text>
+              )}
+              {timestampSelecionado && (
+                <Text
+                  style={{
+                    position: "absolute",
+                    bottom: 70,
+                    left: 150,
+                    color: "#000",
+                    backgroundColor: "#fff",
+                    paddingHorizontal: 5,
+                    paddingVertical: 4,
+                    borderRadius: 0,
+                    fontSize: 12,
+                    ...(Platform.OS === "web"
+                      ? {
+                        bottom: 40,
+                        left: 450,
+                      }
+                      : {}),
+                  }}
+                >
+                  {new Date(timestampSelecionado).toLocaleString("pt-BR")}
+                </Text>
+              )}
+              <TouchableOpacity
+                style={{
+                  position: "absolute",
+                  top: 20,
+                  right: 20,
+                  backgroundColor: "#e74c3c",
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                }}
+                onPress={() => {
+                  setModalFotoVisivel(false);
+                  setFotoSelecionada(null);
+                  setCoordenadasSelecionadas(null);
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                  Fechar
+                </Text>
+              </TouchableOpacity>
+              <Image
+                source={require("../assets/images/logo-metest.png")}
+                style={styles.logoFoto}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    width: "100%",
-    height: "100%",
-  },
+
   conteudo: {
-    flex: 1,
     backgroundColor: "#fff",
-    padding: 20,
     borderRadius: 20,
-    elevation: 3,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 5, height: 5 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
     ...(Platform.OS === "web"
       ? {
-          width: "70%",
-          maxWidth: "100%",
-          alignSelf: "center",
-          justifyContent: "center", // centraliza verticalmente
-          alignItems: "center", // centraliza horizontalmente
-          paddingTop: 40,
-          paddingBottom: 40,
-          marginVertical: "2%",
-        }
+        width: "70%",
+        maxWidth: "100%",
+        alignSelf: "center",
+        justifyContent: "center", // centraliza verticalmente
+        alignItems: "center", // centraliza horizontalmente
+        paddingTop: 40,
+        paddingBottom: 40,
+        marginVertical: "2%",
+      }
       : {
-          flex: 1,
-          width: "95%",
-          marginVertical: 10,
-        }),
+        minWidth: '100%',
+        paddingTop: 20,
+        paddingBottom: 40,
+        paddingHorizontal: 20,
+        flex: 1,
+      }),
   },
 
   title: {
@@ -782,8 +771,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     ...(Platform.OS === "web"
       ? {
-          width: 700,
-        }
+        width: 700,
+      }
       : {}),
   },
   numeroOrdem: {
@@ -836,9 +825,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...(Platform.OS === "web"
       ? {
-          width: "30%",
-          height: "70%",
-        }
+        width: "30%",
+        height: "70%",
+      }
       : {}),
   },
   modalHeader: {
@@ -922,9 +911,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     ...(Platform.OS === "web"
       ? {
-          top: -30,
-          left: 450,
-        }
+        top: -30,
+        left: 450,
+      }
       : {}),
   },
 });

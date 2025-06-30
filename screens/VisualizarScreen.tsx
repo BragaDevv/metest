@@ -47,6 +47,7 @@ interface Ordem {
   inicioExecucao?: any; // ✅ inicio Execução
   finalizadoEm?: any; // ✅ fim (timestamp Firebase)
   executadoPor?: string; // ✅ novo campo
+  tipo?: string;
 }
 
 export default function VisualizarOrdensScreen() {
@@ -72,19 +73,57 @@ export default function VisualizarOrdensScreen() {
 
   const fetchOrdens = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "ordens_servico"));
-      const lista = snapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as Ordem))
-        .filter(
-          (ordem) =>
-            ordem.status !== "finalizada" &&
-            ordem.status !== "aguardando_assinatura"
-        ); // 🔥 Oculta as duas
-      setOrdens(lista);
+      const colecoes = [
+        { nome: "ordens_servico", tipo: "ordem_servico" },
+        { nome: "relatorios_fotograficos", tipo: "relatorio_fotografico" },
+        { nome: "checklists_manutencao", tipo: "checklist_manutencao" },
+        { nome: "pmocs", tipo: "pmoc" },
+        { nome: "visitas_tecnicas", tipo: "visita_tecnica" },
+      ];
+
+      let todasOrdens: Ordem[] = [];
+
+      for (const c of colecoes) {
+        const snapshot = await getDocs(collection(db, c.nome));
+
+        const ordensDaColecao: Ordem[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id ?? "", // garante string
+            cliente: data.cliente ?? "",
+            empresa: data.empresa ?? "",
+            descricao: data.descricao ?? "",
+            localizacao: data.localizacao ?? "",
+            status: data.status ?? "pendente",
+            numeroOrdem: data.numeroOrdem ?? "",
+            assinatura: data.assinatura ?? "",
+            fotosAntes: data.fotosAntes ?? [],
+            fotosDepois: data.fotosDepois ?? [],
+            criadoEm: data.criadoEm ?? null,
+            inicioExecucao: data.inicioExecucao ?? null,
+            finalizadoEm: data.finalizadoEm ?? null,
+            executadoPor: data.executadoPor ?? "",
+            observacoes: data.observacoes ?? "",
+            tipo: c.tipo,
+          };
+        });
+
+        todasOrdens.push(...ordensDaColecao);
+      }
+
+      const filtradas = todasOrdens.filter(
+        (ordem) =>
+          ordem.status !== "finalizada" &&
+          ordem.status !== "aguardando_assinatura"
+      );
+
+      setOrdens(filtradas);
     } catch (err) {
       console.error("Erro ao buscar ordens:", err);
     }
   };
+
+
 
   useFocusEffect(
     useCallback(() => {
@@ -109,6 +148,42 @@ export default function VisualizarOrdensScreen() {
     };
     carregarNome();
   }, [user]);
+
+  const getCollectionPath = (tipo: string | undefined) => {
+    switch (tipo) {
+      case "ordem_servico":
+        return "ordens_servico";
+      case "relatorio_fotografico":
+        return "relatorios_fotograficos";
+      case "checklist_manutencao":
+        return "checklists_manutencao";
+      case "pmoc":
+        return "pmocs";
+      case "visita_tecnica":
+        return "visitas_tecnicas";
+      default:
+        return "ordens_servico"; // fallback
+    }
+  };
+
+
+  const getTipoBadge = (tipo?: string) => {
+    switch (tipo) {
+      case "ordem_servico":
+        return { label: "Ordem de Serviço", cor: "#3498db" }; // azul
+      case "relatorio_fotografico":
+        return { label: "Relatório Fotográfico", cor: "#9b59b6" }; // roxo
+      case "checklist_manutencao":
+        return { label: "Checklist Manutenção", cor: "#e67e22" }; // laranja
+      case "pmoc":
+        return { label: "PMOC", cor: "#2ecc71" }; // verde
+      case "visita_tecnica":
+        return { label: "Visita Técnica", cor: "#f1c40f" }; // amarelo
+      default:
+        return { label: "Desconhecido", cor: "#7f8c8d" }; // cinza
+    }
+  };
+
 
   const abrirNoMapaComEscolha = (endereco: string) => {
     Alert.alert("Abrir no mapa", "Escolha o app de navegação:", [
@@ -139,7 +214,7 @@ export default function VisualizarOrdensScreen() {
     ]);
   };
 
-  const excluirOrdem = async (id: string) => {
+  const excluirOrdem = async (id: string, tipo: string) => {
     Alert.alert("Confirmar", "Tem certeza que deseja excluir esta ordem?", [
       { text: "Cancelar", style: "cancel" },
       {
@@ -147,7 +222,23 @@ export default function VisualizarOrdensScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await deleteDoc(doc(db, "ordens_servico", id));
+            // Mapeia o tipo para o nome da coleção
+            const colecaoPorTipo: { [key: string]: string } = {
+              ordem_servico: "ordens_servico",
+              relatorio_fotografico: "relatorios_fotograficos",
+              checklist_manutencao: "checklists_manutencao",
+              pmoc: "pmocs",
+              visita_tecnica: "visitas_tecnicas",
+            };
+
+            const nomeColecao = colecaoPorTipo[tipo];
+
+            if (!nomeColecao) {
+              Alert.alert("Erro", "Tipo de ordem desconhecido.");
+              return;
+            }
+
+            await deleteDoc(doc(db, nomeColecao, id));
             Alert.alert("Ordem excluída com sucesso");
             fetchOrdens();
           } catch (err) {
@@ -159,7 +250,9 @@ export default function VisualizarOrdensScreen() {
     ]);
   };
 
-  const iniciarOrdem = async (id: string) => {
+
+
+  const iniciarOrdem = async (ordem: Ordem) => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
@@ -170,7 +263,9 @@ export default function VisualizarOrdensScreen() {
       const location = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = location.coords;
 
-      const ordemRef = doc(db, "ordens_servico", id);
+      const caminhoColecao = getCollectionPath(ordem.tipo);
+      const ordemRef = doc(db, caminhoColecao, ordem.id);
+
       await updateDoc(ordemRef, {
         status: "em_execucao",
         inicioExecucao: serverTimestamp(),
@@ -189,6 +284,7 @@ export default function VisualizarOrdensScreen() {
       Alert.alert("Erro ao iniciar ordem");
     }
   };
+
 
   const toggleDetalhes = (id: string) => {
     setDetalhesVisiveis(detalhesVisiveis === id ? null : id);
@@ -242,6 +338,18 @@ export default function VisualizarOrdensScreen() {
         {item.cliente} - {item.empresa}
       </Text>
       <Text style={styles.status}>Status: {item.status}</Text>
+
+      {item.tipo && (
+        <View
+          style={[
+            styles.tipoBadge,
+            { backgroundColor: getTipoBadge(item.tipo).cor },
+          ]}
+        >
+          <Text style={styles.tipoTexto}>{getTipoBadge(item.tipo).label}</Text>
+        </View>
+      )}
+
 
       {detalhesVisiveis === item.id && (
         <View style={styles.detalhesContainer}>
@@ -346,7 +454,9 @@ export default function VisualizarOrdensScreen() {
           {item.status === "pendente" && (
             <TouchableOpacity
               style={styles.button}
-              onPress={() => iniciarOrdem(item.id)}
+              onPress={() => iniciarOrdem(item)}
+
+
             >
               <Text style={styles.buttonText}>Iniciar</Text>
             </TouchableOpacity>
@@ -362,15 +472,15 @@ export default function VisualizarOrdensScreen() {
               </TouchableOpacity>
             ) : (
               <Text
-                        style={{
-                          marginTop: 10,
-                          fontStyle: "italic",
-                          color: "#888",
-                          textAlign: "center",
-                        }}
-                      >
-                        ✍️ Assinatura disponível apenas no mobile.
-                      </Text>
+                style={{
+                  marginTop: 10,
+                  fontStyle: "italic",
+                  color: "#888",
+                  textAlign: "center",
+                }}
+              >
+                ✍️ Assinatura disponível apenas no mobile.
+              </Text>
             )
           )}
 
@@ -379,7 +489,7 @@ export default function VisualizarOrdensScreen() {
           {isAdmin && (
             <TouchableOpacity
               style={styles.trashButton}
-              onPress={() => excluirOrdem(item.id)}
+              onPress={() => excluirOrdem(item.id, item.tipo || "")}
             >
               <Ionicons name="trash" size={22} color="#e74c3c" />
             </TouchableOpacity>
@@ -390,143 +500,130 @@ export default function VisualizarOrdensScreen() {
   );
 
   return (
-    <ImageBackground
-      source={require("../assets/images/bgAll.jpg")}
-      style={styles.container}
-      resizeMode="stretch"
-    >
-      <View style={styles.conteudo}>
-        <Text style={styles.title}>Ordens de Serviço</Text>
-        <View style={styles.filtros}>
-          <TouchableOpacity
-            style={[
-              styles.filtroBotao,
-              filtroStatus === "todas" && styles.filtroAtivo,
-            ]}
-            onPress={() => setFiltroStatus("todas")}
-          >
-            <Text style={styles.filtroTexto}>Todas ({ordens.length})</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.filtroBotao,
-              filtroStatus === "pendente" && styles.filtroAtivo,
-            ]}
-            onPress={() => setFiltroStatus("pendente")}
-          >
-            <Text style={styles.filtroTexto}>
-              Pendentes ({contar("pendente")})
-            </Text>
-          </TouchableOpacity>
+    <View style={styles.conteudo}>
+      <Text style={styles.title}>Serviços</Text>
+      <View style={styles.filtros}>
+        <TouchableOpacity
+          style={[
+            styles.filtroBotao,
+            filtroStatus === "todas" && styles.filtroAtivo,
+          ]}
+          onPress={() => setFiltroStatus("todas")}
+        >
+          <Text style={styles.filtroTexto}>Todas ({ordens.length})</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.filtroBotao,
-              filtroStatus === "em_execucao" && styles.filtroAtivo,
-            ]}
-            onPress={() => setFiltroStatus("em_execucao")}
-          >
-            <Text style={styles.filtroTexto}>
-              Em Execução ({contar("em_execucao")})
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.filtroBotao,
+            filtroStatus === "pendente" && styles.filtroAtivo,
+          ]}
+          onPress={() => setFiltroStatus("pendente")}
+        >
+          <Text style={styles.filtroTexto}>
+            Pendentes ({contar("pendente")})
+          </Text>
+        </TouchableOpacity>
 
-        <View style={styles.buscaContainer}>
-          <Text style={styles.label}>Buscar:</Text>
-          <View style={styles.campoBuscaWrapper}>
-            <Ionicons
-              name="search"
-              size={20}
-              color="#666"
-              style={{ marginRight: 6 }}
-            />
-            <TextInput
-              style={styles.inputBusca}
-              placeholder="Cliente, ID, empresa ou descrição..."
-              placeholderTextColor="#aaa"
-              value={termoBusca}
-              onChangeText={setTermoBusca}
-            />
-          </View>
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.filtroBotao,
+            filtroStatus === "em_execucao" && styles.filtroAtivo,
+          ]}
+          onPress={() => setFiltroStatus("em_execucao")}
+        >
+          <Text style={styles.filtroTexto}>
+            Em Execução ({contar("em_execucao")})
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-        {ordensFiltradas.length === 0 ? (
-          <View style={styles.semOrdensContainer}>
-            <Text style={styles.semOrdensTexto}>
-              📭 Nenhuma ordem no momento.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={ordensFiltradasEBuscadas}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            contentContainerStyle={{ paddingBottom: 30 }}
+      <View style={styles.buscaContainer}>
+        <Text style={styles.label}>Buscar:</Text>
+        <View style={styles.campoBuscaWrapper}>
+          <Ionicons
+            name="search"
+            size={20}
+            color="#666"
+            style={{ marginRight: 6 }}
           />
-        )}
+          <TextInput
+            style={styles.inputBusca}
+            placeholder="Cliente, ID, empresa ou descrição..."
+            placeholderTextColor="#aaa"
+            value={termoBusca}
+            onChangeText={setTermoBusca}
+          />
+        </View>
+      </View>
 
-        {modalFotoVisivel && fotoSelecionada && (
-          <Modal visible={modalFotoVisivel} transparent animationType="fade">
-            <View
+      {ordensFiltradas.length === 0 ? (
+        <View style={styles.semOrdensContainer}>
+          <Text style={styles.semOrdensTexto}>
+            📭 Nenhuma ordem no momento.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={ordensFiltradasEBuscadas}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 30 }}
+        />
+      )}
+
+      {modalFotoVisivel && fotoSelecionada && (
+        <Modal visible={modalFotoVisivel} transparent animationType="fade">
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.9)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <TouchableOpacity
               style={{
-                flex: 1,
-                backgroundColor: "rgba(0,0,0,0.9)",
-                justifyContent: "center",
-                alignItems: "center",
+                position: "absolute",
+                top: 90,
+                right: 30,
+                backgroundColor: "#e74c3c",
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 8,
+              }}
+              onPress={() => {
+                setModalFotoVisivel(false);
               }}
             >
-              <TouchableOpacity
-                style={{
-                  position: "absolute",
-                  top: 90,
-                  right: 30,
-                  backgroundColor: "#e74c3c",
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                }}
-                onPress={() => {
-                  setModalFotoVisivel(false);
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                  Fechar
-                </Text>
-              </TouchableOpacity>
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                Fechar
+              </Text>
+            </TouchableOpacity>
 
-              <Image
-                source={{ uri: fotoSelecionada }}
-                style={{ width: "90%", height: "70%", borderRadius: 10 }}
-                resizeMode="contain"
-              />
-            </View>
-          </Modal>
-        )}
-      </View>
-    </ImageBackground>
+            <Image
+              source={{ uri: fotoSelecionada }}
+              style={{ width: "90%", height: "70%", borderRadius: 10 }}
+              resizeMode="contain"
+            />
+          </View>
+        </Modal>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    width: "100%",
-    height: "100%",
-  },
 
   conteudo: {
-    flex: 1,
     backgroundColor: "#fff",
-    padding: 20,
     borderRadius: 20,
-    elevation: 3,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 5, height: 5 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
     ...(Platform.OS === "web"
       ? {
         width: "70%",
@@ -539,9 +636,11 @@ const styles = StyleSheet.create({
         marginVertical: "2%",
       }
       : {
+        minWidth: '100%',
+        paddingTop: 20,
+        paddingBottom: 40,
+        paddingHorizontal: 20,
         flex: 1,
-        width: "95%",
-        marginVertical: 10
       }),
   },
 
@@ -722,5 +821,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
   },
+  tipoBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  tipoTexto: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 12,
+  },
+
 
 });

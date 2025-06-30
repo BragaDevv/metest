@@ -89,39 +89,141 @@ export default function OrdensFinalizadasScreen() {
       ).join("") || "";
 
       const html = `
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Relatório METEST</title>
-          <style>
-            body { font-family: sans-serif; padding: 20px; }
-            h1 { color: #6c63ff; }
-            img { max-width: 100%; margin-top: 10px; border-radius: 8px; }
-          </style>
-        </head>
-        <body>
-          <h1>Relatório da Ordem nº ${ordem.numeroOrdem}</h1>
-          <p><strong>Cliente:</strong> ${ordem.cliente}</p>
-          <p><strong>Empresa:</strong> ${ordem.empresa}</p>
-          <p><strong>Descrição:</strong> ${ordem.descricao}</p>
-          <p><strong>Status:</strong> ${ordem.status}</p>
-          <p><strong>Serviço Realizado:</strong> ${ordem.descricaoFinal || "-"}</p>
-          <p><strong>Observações:</strong> ${ordem.observacoes || "-"}</p>
-          <h3>Fotos Antes:</h3>
-          ${fotosAntes}
-          <h3>Fotos Depois:</h3>
-          ${fotosDepois}
-          ${ordem.assinatura_cliente
-          ? `<h3>Assinatura Cliente:</h3><img src="${ordem.assinatura_cliente}" style="max-height:150px;" />`
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Relatório Fotográfico - METEST</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 24px;
+        color: #333;
+        background-color: #f9f9f9;
+      }
+      h1 {
+        text-align: center;
+        color: #4a4a91;
+        margin-bottom: 24px;
+      }
+      .box {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 10px 10px;
+        margin-bottom: 10px;
+        background-color: #fff;
+      }
+      .label {
+        font-weight: bold;
+        color: #222;
+      }
+      .grid-2x2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 24px;
+      }
+      .grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .grid img {
+        width: 150px;
+        height: 150px;
+        object-fit: cover;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+      .assinaturas {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .assinatura img {
+        width: 100%;
+        max-width: 300px;
+        max-height: 100px;
+        border: 1px solid #aaa;
+        border-radius: 6px;
+      }
+      .link {
+        margin-top: 6px;
+        display: inline-block;
+        color: #007bff;
+        text-decoration: none;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Relatório Fotográfico de Serviço</h1>
+
+    <div class="box grid-2x2">
+      <div><span class="label">Ordem nº:</span> ${ordem.numeroOrdem}</div>
+      <div><span class="label">Cliente:</span> ${ordem.cliente}</div>
+      <div><span class="label">Empresa:</span> ${ordem.empresa}</div>
+      <div><span class="label">Data:</span> ${ordem.finalizadoEm ? new Date(ordem.finalizadoEm.seconds * 1000).toLocaleString("pt-BR") : "-"}</div>
+    </div>
+
+    <div class="box">
+      <div><span class="label">Descrição do Serviço:</span></div>
+      <p>${ordem.descricaoFinal || "-"}</p>
+
+      <div><span class="label">Observações:</span></div>
+      <p>${ordem.observacoes || "-"}</p>
+
+      ${ordem.localInicio
+          ? `<div><span class="label">Localização GPS:</span><br/>
+            ${ordem.localInicio.latitude}, ${ordem.localInicio.longitude}
+            <br/><a class="link" href="http://maps.google.com/maps?z=12&t=m&q=${ordem.localInicio.latitude},${ordem.localInicio.longitude}" target="_blank">Ver no mapa</a></div>`
           : ""
         }
-          ${ordem.assinatura_metest
-          ? `<h3>Assinatura METEST:</h3><img src="${ordem.assinatura_metest}" style="max-height:150px;" />`
+    </div>
+
+    ${ordem.fotosAntes?.length
+          ? `<div class="box">
+          <div class="label">Fotos Antes:</div>
+          <div class="grid">
+            ${ordem.fotosAntes.map((url) => `<img src="${url}" />`).join("")}
+          </div>
+        </div>`
           : ""
         }
-        </body>
-      </html>
-    `;
+
+    ${ordem.fotosDepois?.length
+          ? `<div class="box">
+          <div class="label">Fotos Depois:</div>
+          <div class="grid">
+            ${ordem.fotosDepois.map((f) => `<img src="${f.url}" />`).join("")}
+          </div>
+        </div>`
+          : ""
+        }
+
+    ${ordem.assinatura_cliente || ordem.assinatura_metest
+          ? `<div class="box">
+            <div class="label">Assinaturas:</div>
+            <div class="assinaturas">
+              ${ordem.assinatura_cliente
+            ? `<div class="assinatura"><span class="label">Cliente:</span><br/><img src="${ordem.assinatura_cliente}" /></div>`
+            : ""
+          }
+              ${ordem.assinatura_metest
+            ? `<div class="assinatura"><span class="label">METEST:</span><br/><img src="${ordem.assinatura_metest}" /></div>`
+            : ""
+          }
+            </div>
+          </div>`
+          : ""
+        }
+
+  </body>
+</html>
+`;
+
+
+
 
       if (Platform.OS === "web") {
         // Web: cria blob e força download
@@ -365,41 +467,28 @@ export default function OrdensFinalizadasScreen() {
   );
 
   return (
-    <ImageBackground
-      source={require("../assets/images/bgAll.jpg")}
-      style={styles.container}
-      resizeMode="stretch"
-    >
-      <View style={styles.conteudo}>
-        <Text style={styles.title}>Ordens Concluídas</Text>
-        <FlatList
-          data={ordensFinalizadas}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 30 }}
-        />
-      </View>
-    </ImageBackground>
+    <View style={styles.conteudo}>
+      <Text style={styles.title}>Ordens Concluídas</Text>
+      <FlatList
+        data={ordensFinalizadas}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={{ paddingBottom: 30 }}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    width: "100%",
-    height: "100%",
-  },
+
   conteudo: {
-    flex: 1,
     backgroundColor: "#fff",
-    padding: 20,
     borderRadius: 20,
-    elevation: 3,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 5, height: 5 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
     ...(Platform.OS === "web"
       ? {
         width: "70%",
@@ -412,11 +501,14 @@ const styles = StyleSheet.create({
         marginVertical: "2%",
       }
       : {
+        minWidth: '100%',
+        paddingTop: 20,
+        paddingBottom: 40,
+        paddingHorizontal: 20,
         flex: 1,
-        width: "95%",
-        marginVertical: 10,
       }),
   },
+
   title: {
     fontSize: 24,
     fontWeight: "bold",
@@ -465,7 +557,7 @@ const styles = StyleSheet.create({
   },
   pdfButton: {
     marginTop: 12,
-    backgroundColor: "#6c63ff",
+    backgroundColor: "#F39C12",
     padding: 10,
     borderRadius: 8,
     alignItems: "center",

@@ -9,5 +9,10 @@ export type RootStackParamList = {
   AssinaturaScreen: undefined;
   FinalizadasScreen: undefined;
   CadastroScreen: undefined;
-  AdminPainelScreen:undefined;
+  CadastroClienteScreen: undefined;
+  AdminPainelScreen: undefined;
+  RelatorioFotograficoScreen: undefined;
+  ChecklistManutencaoScreen: undefined;
+  PMOCScreen: undefined;
+  VisitaTecnicaScreen: undefined;
 }
