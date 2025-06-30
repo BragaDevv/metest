@@ -51,32 +51,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       setUser(firebaseUser);
 
-      // Evita sobrescrever se já foi definido via login()
       if (tipoFoiCarregadoNoLogin.current) {
         setLoading(false);
         return;
       }
 
-      try {
-        const snap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
-        const data = snap.data();
-        const rawTipo = data?.tipo;
+      let tentativas = 0;
+      const maxTentativas = 5;
 
-        console.log("📦 Dados do usuário (onAuthStateChanged):", data);
+      while (tentativas < maxTentativas) {
+        try {
+          const snap = await getDoc(doc(db, "usuarios", firebaseUser.uid));
+          const data = snap.data();
+          const rawTipo = data?.tipo;
 
-        if (isTipoValido(rawTipo)) {
-          setTipo(rawTipo);
-          console.log(`👤 Tipo detectado automaticamente: ${rawTipo}`);
-        } else {
-          setTipo(null);
-          console.warn("⚠️ Tipo inválido encontrado:", rawTipo);
+          console.log(`📦 Tentativa ${tentativas + 1}:`, data);
+
+          if (isTipoValido(rawTipo)) {
+            setTipo(rawTipo);
+            console.log(`👤 Tipo detectado automaticamente: ${rawTipo}`);
+            break;
+          }
+
+          tentativas++;
+          await new Promise((resolve) => setTimeout(resolve, 1000)); // espera 1s antes de tentar de novo
+        } catch (error) {
+          console.warn("⚠️ Erro ao buscar tipo do usuário:", error);
+          break;
         }
-      } catch (error) {
-        console.warn("⚠️ Erro ao buscar tipo do usuário:", error);
-        setTipo(null);
-      } finally {
-        setLoading(false);
       }
+
+      if (!tipo) {
+        console.warn(
+          "⚠️ Não foi possível detectar o tipo após múltiplas tentativas"
+        );
+      }
+
+      setLoading(false);
     });
 
     return unsubscribe;

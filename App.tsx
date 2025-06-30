@@ -53,7 +53,8 @@ Notifications.setNotificationHandler({
 const AppContent = () => {
   const { user, tipo, loading } = useAuth();
 
-  if (loading) {
+  // Aguarde carregamento completo do usuário e do tipo
+  if (loading || (user && !tipo)) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -63,7 +64,7 @@ const AppContent = () => {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: Platform.OS !== "web", title: "" }}>
-      {!user || !tipo ? (
+      {!user ? (
         <Stack.Screen name="LoginScreen" component={LoginScreen} options={{ headerShown: false }} />
       ) : (
         <>
@@ -81,6 +82,7 @@ const AppContent = () => {
     </Stack.Navigator>
   );
 };
+
 
 export default function App() {
   const notificationListener = useRef<Notifications.Subscription | null>(null);
