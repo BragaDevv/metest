@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -32,7 +31,6 @@ import { RootStackParamList } from "../types/types";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 
-
 export default function AbrirOrdemServicoScreen() {
   const [cliente, setCliente] = useState("");
   const [empresa, setEmpresa] = useState("");
@@ -46,8 +44,12 @@ export default function AbrirOrdemServicoScreen() {
   const [clientesLista, setClientesLista] = useState<any[]>([]);
   const [listaVisivel, setListaVisivel] = useState(false);
   const [loadingOrdem, setLoadingOrdem] = useState(false);
+  const [contato, setContato] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [email, setEmail] = useState("");
 
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   useEffect(() => {
     const carregarClientes = async () => {
@@ -72,10 +74,13 @@ export default function AbrirOrdemServicoScreen() {
     data.append("upload_preset", "metest_unsigned");
     data.append("cloud_name", "dy48gdjlv");
 
-    const res = await fetch("https://api.cloudinary.com/v1_1/dy48gdjlv/image/upload", {
-      method: "POST",
-      body: data,
-    });
+    const res = await fetch(
+      "https://api.cloudinary.com/v1_1/dy48gdjlv/image/upload",
+      {
+        method: "POST",
+        body: data,
+      }
+    );
 
     const json = await res.json();
     return json.secure_url;
@@ -93,11 +98,10 @@ export default function AbrirOrdemServicoScreen() {
 
       const resizedUploads = await Promise.all(
         uris.map((uri) =>
-          ImageManipulator.manipulateAsync(
-            uri,
-            [{ resize: { width: 800 } }],
-            { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
-          )
+          ImageManipulator.manipulateAsync(uri, [{ resize: { width: 800 } }], {
+            compress: 0.6,
+            format: ImageManipulator.SaveFormat.JPEG,
+          })
         )
       );
 
@@ -146,17 +150,23 @@ export default function AbrirOrdemServicoScreen() {
         numeroOrdem,
         cliente,
         empresa,
+        contato,
+        telefone,
+        email,
         descricao,
         localizacao: `${localizacao}, Nº ${numero}`,
         fotosAntes,
         status: "pendente",
         criadoEm: serverTimestamp(),
-        tipo: "relatorio_fotografico", // ← tipo de ordem
+        tipo: "relatorio_fotografico",
       });
 
       Alert.alert(`Relatório n° ${numeroOrdem} criado com sucesso!`);
       setCliente("");
       setEmpresa("");
+      setContato("");
+      setTelefone("");
+      setEmail("");
       setDescricao("");
       setCep("");
       setNumero("");
@@ -172,7 +182,6 @@ export default function AbrirOrdemServicoScreen() {
       setLoadingOrdem(false);
     }
   };
-
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -203,7 +212,12 @@ export default function AbrirOrdemServicoScreen() {
                   setCep(cli.cep || "");
                   setNumero(cli.numero || "");
                   setEnderecoCompleto(cli.endereco || "");
-                  setLocalizacao(cli.endereco || "");
+                  setLocalizacao(
+                    `${cli.endereco || ""}, Nº ${cli.numero || ""}`
+                  );
+                  setContato(cli.contato || "");
+                  setTelefone(cli.telefone || "");
+                  setEmail(cli.email || "");
                   setBuscaCliente(cli.nome);
                   setListaVisivel(false);
                 }}
@@ -214,11 +228,37 @@ export default function AbrirOrdemServicoScreen() {
         </View>
       )}
 
-      <Text style={styles.label}>Cliente:</Text>
-      <Text style={styles.valor}>{cliente}</Text>
+      <View style={styles.cardCliente}>
+        <Text style={styles.cardTitle}>🧾 Dados do Cliente</Text>
 
-      <Text style={styles.label}>Endereço:</Text>
-      <Text style={styles.valor}>{enderecoCompleto}, Nº {numero}</Text>
+        <View style={styles.infoRow}>
+         
+          <Ionicons name="business" size={20} color="#2c3e50" />
+          <Text style={styles.infoText}>{cliente}</Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Ionicons name="person" size={20} color="#2c3e50" />
+          <Text style={styles.infoText}>{contato}</Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Ionicons name="call" size={20} color="#2c3e50" />
+          <Text style={styles.infoText}>{telefone}</Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Ionicons name="mail" size={20} color="#2c3e50" />
+          <Text style={styles.infoText}>{email}</Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Ionicons name="location" size={20} color="#2c3e50" />
+          <Text style={styles.infoText}>
+            {enderecoCompleto}, Nº {numero}
+          </Text>
+        </View>
+      </View>
 
       <Text style={styles.label}>Descrição do Serviço:</Text>
       <TextInput
@@ -229,29 +269,36 @@ export default function AbrirOrdemServicoScreen() {
         multiline
       />
 
-      <TouchableOpacity style={styles.imageButton} onPress={handlePickMultipleImages}>
+      <TouchableOpacity
+        style={styles.imageButton}
+        onPress={handlePickMultipleImages}
+      >
         <MaterialIcons name="photo-camera" size={22} color="#fff" />
         <Text style={styles.imageButtonText}>Adicionar Foto</Text>
       </TouchableOpacity>
 
-      <FlatList
-        data={fotosAntes}
-        horizontal
-        keyExtractor={(_, index) => index.toString()}
-        contentContainerStyle={{ paddingVertical: 10 }}
-        renderItem={({ item, index }) => (
-          <View style={styles.imagePreviewContainer}>
-            <Image source={{ uri: item }} style={styles.imagePreview} />
-            <TouchableOpacity
-              style={styles.removeImage}
-              onPress={() => handleRemoveImage(index)}
-            >
-              <Ionicons name="close-circle" size={22} color="#e74c3c" />
-            </TouchableOpacity>
-          </View>
-        )}
-      />
+      <View>
+        <Text style={styles.label}>Fotos Auxiliares:</Text>
 
+        <FlatList
+          data={fotosAntes}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(_, index) => index.toString()}
+          contentContainerStyle={{ paddingVertical: 10 }}
+          renderItem={({ item, index }) => (
+            <View style={styles.imagePreviewContainer}>
+              <Image source={{ uri: item }} style={styles.imagePreview} />
+              <TouchableOpacity
+                style={styles.removeImage}
+                onPress={() => handleRemoveImage(index)}
+              >
+                <Ionicons name="close-circle" size={22} color="#e74c3c" />
+              </TouchableOpacity>
+            </View>
+          )}
+        />
+      </View>
 
       <TouchableOpacity style={styles.botao} onPress={handleSubmit}>
         <Text style={styles.botaoTexto}>Criar Relatório</Text>
@@ -271,21 +318,21 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     ...(Platform.OS === "web"
       ? {
-        width: 1000, // exatamente o mesmo tamanho da tela "visualizar"
-        maxWidth: "95%",
-        alignSelf: "center",
-        justifyContent: "center",
-        alignItems: "center",
-        marginTop: 30,
-        marginBottom: 30,
-      }
+          width: 1000, // exatamente o mesmo tamanho da tela "visualizar"
+          maxWidth: "95%",
+          alignSelf: "center",
+          justifyContent: "center",
+          alignItems: "center",
+          marginTop: 30,
+          marginBottom: 30,
+        }
       : {
-        minWidth: '100%',
-        paddingTop: 20,
-        paddingBottom: 40,
-        paddingHorizontal: 20,
-        flex: 1,
-      }),
+          minWidth: "100%",
+          paddingTop: 20,
+          paddingBottom: 40,
+          paddingHorizontal: 20,
+          flex: 1,
+        }),
   },
   title: {
     fontSize: 22,
@@ -368,5 +415,31 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
     borderRadius: 10,
   },
-
+  cardCliente: {
+    backgroundColor: "#fefefe",
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#2c3e50",
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  infoText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#34495e",
+  },
 });
