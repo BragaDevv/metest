@@ -228,38 +228,39 @@ export default function AbrirOrdemServicoScreen() {
         </View>
       )}
 
-      <View style={styles.cardCliente}>
-        <Text style={styles.cardTitle}>🧾 Dados do Cliente</Text>
+      {cliente !== "" && (
+        <View style={styles.cardCliente}>
+          <Text style={styles.cardTitle}>🧾 Dados do Cliente</Text>
 
-        <View style={styles.infoRow}>
-         
-          <Ionicons name="business" size={20} color="#2c3e50" />
-          <Text style={styles.infoText}>{cliente}</Text>
+          <View style={styles.infoRow}>
+
+            <Ionicons name="business" size={20} color="#2c3e50" />
+            <Text style={styles.infoText}>{cliente}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Ionicons name="person" size={20} color="#2c3e50" />
+            <Text style={styles.infoText}>{contato}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Ionicons name="call" size={20} color="#2c3e50" />
+            <Text style={styles.infoText}>{telefone}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Ionicons name="mail" size={20} color="#2c3e50" />
+            <Text style={styles.infoText}>{email}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Ionicons name="location" size={20} color="#2c3e50" />
+            <Text style={styles.infoText}>
+              {enderecoCompleto}, Nº {numero}
+            </Text>
+          </View>
         </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="person" size={20} color="#2c3e50" />
-          <Text style={styles.infoText}>{contato}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="call" size={20} color="#2c3e50" />
-          <Text style={styles.infoText}>{telefone}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="mail" size={20} color="#2c3e50" />
-          <Text style={styles.infoText}>{email}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="location" size={20} color="#2c3e50" />
-          <Text style={styles.infoText}>
-            {enderecoCompleto}, Nº {numero}
-          </Text>
-        </View>
-      </View>
-
+      )}
       <Text style={styles.label}>Descrição do Serviço:</Text>
       <TextInput
         style={styles.input}
@@ -318,21 +319,21 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     ...(Platform.OS === "web"
       ? {
-          width: 1000, // exatamente o mesmo tamanho da tela "visualizar"
-          maxWidth: "95%",
-          alignSelf: "center",
-          justifyContent: "center",
-          alignItems: "center",
-          marginTop: 30,
-          marginBottom: 30,
-        }
+        width: 1000, // exatamente o mesmo tamanho da tela "visualizar"
+        maxWidth: "95%",
+        alignSelf: "center",
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: 30,
+        marginBottom: 30,
+      }
       : {
-          minWidth: "100%",
-          paddingTop: 20,
-          paddingBottom: 40,
-          paddingHorizontal: 20,
-          flex: 1,
-        }),
+        minWidth: "100%",
+        paddingTop: 20,
+        paddingBottom: 40,
+        paddingHorizontal: 20,
+        flex: 1,
+      }),
   },
   title: {
     fontSize: 22,
